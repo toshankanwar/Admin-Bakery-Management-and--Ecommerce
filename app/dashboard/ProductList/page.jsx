@@ -9,7 +9,7 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import DeleteConfirmation from './DeleteConfirmation';
-import { deleteBakeryItem } from '@/firebase/firestore';
+import { deleteBakeryItem } from '@/firebase/firebase';
 
 const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
   const [searchTerm, setSearchTerm] = useState('');
