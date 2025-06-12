@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import CustomerList from '@/components/dashboard/CustomerList';
 import CustomerDetails from '@/components/dashboard/CustomerDetails';
-import { getCustomers } from '@/firebase/firestore';
+import { getCustomers } from '@/firebase/firebase';
 import Toast from '@/components/Toast';
 
 export default function CustomersPage() {

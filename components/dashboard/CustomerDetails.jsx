@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { updateCustomer } from '@/firebase/firestore';
+import { updateCustomer } from '@/firebase/firebase';
 import { formatDate } from '@/utils/dateUtils';
 
 const CustomerDetails = ({ customer, onClose, onUpdate }) => {

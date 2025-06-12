@@ -17,7 +17,7 @@ import {
   CurrencyDollarIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
-import DeleteConfirmation from './DeleteConfirmation';
+import DeleteConfirmation from '../../app/dashboard/ProductList/DeleteConfirmation';
 import { deleteProduct } from '@/firebase/firebase';
 
 const CURRENT_TIMESTAMP = new Date().toISOString();
