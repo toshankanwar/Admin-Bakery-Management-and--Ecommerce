@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import {
   PencilIcon,
-  TrashIcon,
   MagnifyingGlassIcon,
   ShoppingBagIcon,
   TagIcon,
@@ -17,10 +16,8 @@ import {
   CurrencyDollarIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
-import DeleteConfirmation from '../../app/dashboard/ProductList/DeleteConfirmation';
-import { deleteProduct } from '@/firebase/firebase';
 
-const CURRENT_TIMESTAMP = new Date().toISOString();
+const CURRENT_TIMESTAMP = '2025-06-13 01:34:28';
 const CURRENT_USER = 'Kala-bot-apk';
 
 const categories = [
@@ -37,57 +34,54 @@ const dropdownVariants = {
   visible: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -10 }
 };
+
 const formatDateTime = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / 1000 / 60);
-    
-    // Show relative time for recent updates
-    if (diffInMinutes < 1) {
-      return 'Just now';
-    } else if (diffInMinutes < 60) {
-      return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
-    } else if (diffInMinutes < 1440) { // Less than 24 hours
-      const hours = Math.floor(diffInMinutes / 60);
-      return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
-    }
+  if (!timestamp) return 'N/A';
   
-    // Format time (HH:mm:ss)
-    const time = date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffInMinutes = Math.floor((now - date) / 1000 / 60);
   
-    // Format date (dd/mm/yyyy)
-    const dateStr = date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  
-    return `${time} - ${dateStr}`;
-  };
+  if (diffInMinutes < 1) {
+    return 'Just now';
+  } else if (diffInMinutes < 60) {
+    return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
+  } else if (diffInMinutes < 1440) {
+    const hours = Math.floor(diffInMinutes / 60);
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  }
+
+  const time = date.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  const dateStr = date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+
+  return `${time} - ${dateStr}`;
+};
+
 const listItemVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
   exit: { opacity: 0, x: -20 }
 };
 
-const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
+const ProductList = ({ products, loading, onEdit }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [categoryStats, setCategoryStats] = useState({});
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  // Calculate category counts
   useEffect(() => {
     const stats = products.reduce((acc, product) => {
       acc[product.category] = (acc[product.category] || 0) + 1;
@@ -96,7 +90,6 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
     setCategoryStats(stats);
   }, [products]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -119,30 +112,6 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
     searchInputRef.current?.focus();
   };
 
-  const handleDelete = async () => {
-    if (!deleteConfirmation) return;
-
-    try {
-      const result = await deleteProduct(deleteConfirmation.id);
-      if (result.success) {
-        console.log('Product deleted successfully:', {
-          product: deleteConfirmation.name,
-          timestamp: CURRENT_TIMESTAMP,
-          user: CURRENT_USER
-        });
-        onDeleteSuccess();
-      }
-    } catch (error) {
-      console.error('Error deleting product:', {
-        error: error.message,
-        timestamp: CURRENT_TIMESTAMP,
-        user: CURRENT_USER
-      });
-    } finally {
-      setDeleteConfirmation(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
@@ -162,7 +131,6 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row gap-4 bg-white p-6 rounded-xl shadow-sm border border-purple-100"
       >
-        {/* Enhanced Search Bar */}
         <div className="relative flex-1">
           <div className="relative">
             <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400" />
@@ -197,7 +165,6 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
           )}
         </div>
 
-        {/* Enhanced Category Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -308,33 +275,32 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
                               </span>
                             </div>
                             <div className="flex items-center text-gray-600 group relative">
-  <ClockIcon className="h-4 w-4 text-purple-500 mr-1" />
-  <motion.span 
-    className="text-sm whitespace-nowrap"
-    whileHover={{ scale: 1.02 }}
-  >
-    {formatDateTime(product.updatedAt)}
-  </motion.span>
-  
-  {/* Optional tooltip for exact timestamp */}
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    whileHover={{ opacity: 1, y: 0 }}
-    className="absolute bottom-full left-0 mb-2 hidden group-hover:block"
-  >
-    <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-      {new Date(product.updatedAt).toLocaleString('en-GB', {
-        hour12: false,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      })}
-    </div>
-  </motion.div>
-</div>
+                              <ClockIcon className="h-4 w-4 text-purple-500 mr-1" />
+                              <motion.span 
+                                className="text-sm whitespace-nowrap"
+                                whileHover={{ scale: 1.02 }}
+                              >
+                                {formatDateTime(product.updatedAt)}
+                              </motion.span>
+                              
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                whileHover={{ opacity: 1, y: 0 }}
+                                className="absolute bottom-full left-0 mb-2 hidden group-hover:block"
+                              >
+                                <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                  {new Date(product.updatedAt).toLocaleString('en-GB', {
+                                    hour12: false,
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                  })}
+                                </div>
+                              </motion.div>
+                            </div>
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <span
@@ -358,7 +324,7 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
                     <motion.div
                       initial={{ opacity: 0.6 }}
                       animate={{ opacity: hoveredId === product.id ? 1 : 0.6 }}
-                      className="ml-6 flex-shrink-0 flex gap-2"
+                      className="ml-6 flex-shrink-0"
                     >
                       <motion.button
                         whileHover={{ scale: 1.1 }}
@@ -367,14 +333,6 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
                         className="p-2 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded-full transition-colors"
                       >
                         <PencilIcon className="h-5 w-5" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setDeleteConfirmation(product)}
-                        className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-full transition-colors"
-                      >
-                        <TrashIcon className="h-5 w-5" />
                       </motion.button>
                     </motion.div>
                   </div>
@@ -397,19 +355,6 @@ const ProductList = ({ products, loading, onEdit, onDeleteSuccess }) => {
           )}
         </AnimatePresence>
       </div>
-
-      {/* Delete Confirmation Dialog */}
-      <AnimatePresence>
-        {deleteConfirmation && (
-          <DeleteConfirmation
-            isOpen={!!deleteConfirmation}
-            onClose={() => setDeleteConfirmation(null)}
-            onConfirm={handleDelete}
-            title="Delete Product"
-            message={`Are you sure you want to delete "${deleteConfirmation.name}"? This action cannot be undone.`}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 };
