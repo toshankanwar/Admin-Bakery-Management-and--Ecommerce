@@ -265,7 +265,7 @@ const ProductList = ({ products, loading, onEdit }) => {
                             <div className="flex items-center text-gray-600">
                               <CurrencyDollarIcon className="h-4 w-4 text-purple-500 mr-1" />
                               <span className="text-sm font-medium">
-                                ${Number(product.price).toFixed(2)}
+                              ₹{Number(product.price).toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center text-gray-600">

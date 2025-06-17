@@ -13,7 +13,6 @@ import {
   UserPlusIcon,
   ShoppingCartIcon,
   PencilSquareIcon,
-  PlusCircleIcon,
   BellIcon
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
@@ -25,19 +24,17 @@ import { useAuth } from "@/contexts/AuthContext";
 const STATS_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds
 const TIME_REFRESH_INTERVAL = 1000; // 1 second in milliseconds
 const getCurrentTimestamp = () => {
-    const now = new Date();
-    return now.toISOString().slice(0, 19).replace('T', ' ');
-  };
-  
-  // Update the CURRENT_TIMESTAMP to be dynamic
-  const CURRENT_TIMESTAMP = getCurrentTimestamp(); // Current UTC timestamp
+  const now = new Date();
+  return now.toISOString().slice(0, 19).replace('T', ' ');
+};
+
+const CURRENT_TIMESTAMP = '2025-06-17 17:11:01';
 const CURRENT_USER = 'Kala-bot-apk';
 
 const ACTIVITY_TYPES = {
   USER_SIGNUP: 'USER_SIGNUP',
   NEW_ORDER: 'NEW_ORDER',
-  PRODUCT_UPDATE: 'PRODUCT_UPDATE',
-  PRODUCT_ADD: 'PRODUCT_ADD'
+  PRODUCT_UPDATE: 'PRODUCT_UPDATE'
 };
 
 const formatDateTime = (date) => {
@@ -89,7 +86,7 @@ const statsItems = [
     id: 'revenue',
     name: "Total Revenue",
     icon: CurrencyDollarIcon,
-    formatter: (value) => `$${Number(value).toFixed(2)}`,
+    formatter: (value) => `₹${Number(value).toFixed(2)}`,
     gradient: "from-violet-500 to-violet-600",
   },
   {
@@ -136,12 +133,6 @@ const ActivityItem = ({ activity }) => {
             <PencilSquareIcon className="h-5 w-5 text-purple-600" />
           </div>
         );
-      case ACTIVITY_TYPES.PRODUCT_ADD:
-        return (
-          <div className="rounded-full bg-pink-100 p-2">
-            <PlusCircleIcon className="h-5 w-5 text-pink-600" />
-          </div>
-        );
       default:
         return (
           <div className="rounded-full bg-gray-100 p-2">
@@ -174,8 +165,7 @@ const ActivityItem = ({ activity }) => {
       </div>
       {activity.metadata && (
         <div className="flex-shrink-0">
-          {(activity.type === ACTIVITY_TYPES.PRODUCT_UPDATE || 
-            activity.type === ACTIVITY_TYPES.PRODUCT_ADD) ? (
+          {activity.type === ACTIVITY_TYPES.PRODUCT_UPDATE ? (
             <div className="w-12 h-12 rounded-lg border border-gray-200 overflow-hidden">
               <Image
                 src={activity.metadata.imageUrl || '/placeholder-product.jpg'}
@@ -187,7 +177,7 @@ const ActivityItem = ({ activity }) => {
             </div>
           ) : activity.type === ACTIVITY_TYPES.NEW_ORDER ? (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              ${activity.metadata.total}
+              ₹{activity.metadata.total}
             </span>
           ) : null}
         </div>
@@ -214,13 +204,16 @@ const RecentActivity = () => {
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added') {
             const userData = change.doc.data();
-            setActivities((prev) => [{
-              id: change.doc.id,
-              type: ACTIVITY_TYPES.USER_SIGNUP,
-              message: `New user ${userData.displayName || userData.email} joined`,
-              timestamp: userData.createdAt,
-              user: userData.email,
-            }, ...prev].slice(0, 10));
+            setActivities((prev) => [
+              {
+                id: change.doc.id,
+                type: ACTIVITY_TYPES.USER_SIGNUP,
+                message: `New user ${userData.displayName || userData.email} joined`,
+                timestamp: userData.createdAt,
+                user: userData.email,
+              },
+              ...prev.filter(a => a.id !== change.doc.id)
+            ].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
           }
         });
       }
@@ -238,24 +231,27 @@ const RecentActivity = () => {
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added') {
             const orderData = change.doc.data();
-            setActivities((prev) => [{
-              id: change.doc.id,
-              type: ACTIVITY_TYPES.NEW_ORDER,
-              message: `New order #${change.doc.id.slice(-6)} placed`,
-              timestamp: orderData.createdAt,
-              user: orderData.userEmail,
-              metadata: {
-                total: orderData.total,
-                items: orderData.items.length
-              }
-            }, ...prev].slice(0, 10));
+            setActivities((prev) => [
+              {
+                id: change.doc.id,
+                type: ACTIVITY_TYPES.NEW_ORDER,
+                message: `New order #${change.doc.id.slice(-6)} placed`,
+                timestamp: orderData.createdAt,
+                user: orderData.userEmail,
+                metadata: {
+                  total: orderData.total,
+                  items: orderData.items.length
+                }
+              },
+              ...prev.filter(a => a.id !== change.doc.id)
+            ].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
           }
         });
       }
     );
     unsubscribeCallbacks.push(orderSubscription);
 
-    // Listen for product changes
+    // Listen for product updates only
     const productSubscription = onSnapshot(
       query(
         collection(db, 'bakeryItems'),
@@ -265,30 +261,21 @@ const RecentActivity = () => {
       (snapshot) => {
         snapshot.docChanges().forEach((change) => {
           const productData = change.doc.data();
-          if (change.type === 'added') {
-            setActivities((prev) => [{
-              id: change.doc.id,
-              type: ACTIVITY_TYPES.PRODUCT_ADD,
-              message: `New product "${productData.name}" added`,
-              timestamp: productData.createdAt || getCurrentTimestamp(),
-              user: productData.createdBy || CURRENT_USER,
-              metadata: {
-                name: productData.name,
-                imageUrl: productData.imageUrl
-              }
-            }, ...prev].slice(0, 10));
-          } else if (change.type === 'modified') {
-            setActivities((prev) => [{
-              id: change.doc.id,
-              type: ACTIVITY_TYPES.PRODUCT_UPDATE,
-              message: `Product "${productData.name}" updated`,
-              timestamp: productData.updatedAt,
-              user: productData.updatedBy || CURRENT_USER,
-              metadata: {
-                name: productData.name,
-                imageUrl: productData.imageUrl
-              }
-            }, ...prev].slice(0, 10));
+          if (change.type === 'modified') {
+            setActivities((prev) => [
+              {
+                id: change.doc.id,
+                type: ACTIVITY_TYPES.PRODUCT_UPDATE,
+                message: `Product "${productData.name}" updated`,
+                timestamp: productData.updatedAt,
+                user: productData.updatedBy || CURRENT_USER,
+                metadata: {
+                  name: productData.name,
+                  imageUrl: productData.imageUrl
+                }
+              },
+              ...prev.filter(a => a.id !== change.doc.id)
+            ].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
           }
         });
       }
@@ -383,54 +370,77 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       setError(null);
-
-      const ordersQuery = query(
-        collection(db, 'orders'), 
-        orderBy('createdAt', 'desc')
-      );
-      
-      const productsQuery = query(
-        collection(db, 'bakeryItems'),
-        where('inStock', '==', true)
-      );
-      
-      const customersQuery = query(
-        collection(db, 'users'),
-        where('role', '==', 'user')
-      );
-
-      const [ordersSnapshot, productsSnapshot, customersSnapshot] = await Promise.all([
-        getDocs(ordersQuery),
-        getDocs(productsQuery),
-        getDocs(customersQuery)
-      ]);
-
-      const totalRevenue = ordersSnapshot.docs.reduce((sum, doc) => {
-        const orderData = doc.data();
-        return sum + (Number(orderData.total) || 0);
-      }, 0);
-
-      setStats({
-        revenue: totalRevenue,
-        orders: ordersSnapshot.size,
-        products: productsSnapshot.size,
-        customers: customersSnapshot.size
-      });
-
-      setLastFetchTime(new Date());
-
+  
+      // Create basic queries without complex where clauses
+      const ordersRef = collection(db, 'orders');
+      const productsRef = collection(db, 'bakeryItems');
+      const customersRef = collection(db, 'users');
+  
+      try {
+        // Get all orders first
+        const ordersSnapshot = await getDocs(query(ordersRef, orderBy('createdAt', 'desc')));
+        
+        // Calculate stats from the snapshots
+        let totalRevenue = 0;
+        let activeOrders = 0;
+  
+        ordersSnapshot.forEach(doc => {
+          const order = doc.data();
+          if (order && order.orderStatus) {
+            // Count non-cancelled orders
+            if (order.orderStatus !== 'cancelled') {
+              activeOrders++;
+            }
+            // Sum revenue from delivered orders
+            if (order.orderStatus === 'delivered' && order.total) {
+              totalRevenue += Number(order.total) || 0;
+            }
+          }
+        });
+  
+        // Get products and customers count
+        const [productsSnapshot, customersSnapshot] = await Promise.all([
+          getDocs(query(productsRef, where('inStock', '==', true))),
+          getDocs(query(customersRef, where('role', '==', 'user')))
+        ]);
+  
+        setStats({
+          revenue: totalRevenue,
+          orders: activeOrders,
+          products: productsSnapshot.size,
+          customers: customersSnapshot.size
+        });
+  
+        setLastFetchTime(new Date());
+  
+      } catch (queryError) {
+        console.error("Query execution error:", {
+          error: queryError.message,
+          code: queryError.code,
+          timestamp: '2025-06-17 17:19:16',
+          user: 'Kala-bot-apk'
+        });
+        throw queryError;
+      }
+  
     } catch (error) {
       console.error("Error fetching dashboard stats:", {
         error: error.message,
-        timestamp: fullDateTime,
-        user: user?.email || 'anonymous'
+        stack: error.stack,
+        timestamp: '2025-06-17 17:19:16',
+        user: user?.email || 'Kala-bot-apk'
       });
-      setError("Failed to load dashboard statistics");
+      setError("Failed to load dashboard statistics. Please try again.");
+      setStats({
+        revenue: 0,
+        orders: 0,
+        products: 0,
+        customers: 0
+      });
     } finally {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     if (!authLoading && (!lastFetchTime || new Date() - lastFetchTime > STATS_REFRESH_INTERVAL)) {
       fetchDashboardStats();
