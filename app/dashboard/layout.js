@@ -18,6 +18,7 @@ const navigationItems = [
   { name: "Overview", href: "/dashboard", icon: HomeIcon },
   { name: "Products", href: "/dashboard/products", icon: ShoppingBagIcon },
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardDocumentListIcon },
+  { name: "Stock Tracker", href: "/dashboard/stock-tracker", icon: ClipboardDocumentListIcon },
   { name: "Settings", href: "/dashboard/settings", icon: Cog6ToothIcon },
 ];
 
