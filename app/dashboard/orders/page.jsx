@@ -10,7 +10,7 @@ const OrderDetails = ({ order, onClose, onStatusUpdate }) => {
   if (!order) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6 min-w-[320px] max-w-xl w-full border border-purple-100">
+    <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6 w-full max-w-2xl mx-auto border border-purple-100">
       <div className="flex justify-between items-center border-b pb-4">
         <h2 className="text-xl font-bold text-purple-800 flex items-center gap-2">
           <span className="text-xs font-mono text-gray-400">Order</span>
@@ -172,19 +172,19 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-200 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-200 p-0">
       <Toast
         message={notification.message}
         type={notification.type}
         onClose={() => setNotification({ message: '', type: '' })}
       />
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-full w-full mx-auto">
+        <div className="flex items-center justify-between px-6 pt-8 pb-4">
           <h1 className="text-3xl font-extrabold text-purple-800">Orders Management</h1>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="flex flex-col lg:flex-row gap-8 px-6 pb-8">
           {/* Orders List */}
-          <div className="md:col-span-2">
+          <div className={`w-full ${selectedOrder ? 'lg:w-2/3' : ''} transition-all`}>
             <OrderList
               orders={orders || []}
               loading={loading}
@@ -193,27 +193,25 @@ export default function OrdersPage() {
               onStatusUpdate={handleStatusUpdate}
             />
           </div>
-          {/* Order Details */}
-          <div className="md:col-span-1 flex flex-col items-center">
-            <AnimatePresence mode="wait">
-              {selectedOrder && (
-                <motion.div
-                  key="order-details"
-                  initial={{ opacity: 0, x: 24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 24 }}
-                  transition={{ type: "spring", damping: 20 }}
-                  className="w-full"
-                >
-                  <OrderDetails
-                    order={selectedOrder}
-                    onClose={() => setSelectedOrder(null)}
-                    onStatusUpdate={handleStatusUpdate}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* Order Details (full width on mobile, right panel on desktop) */}
+          <AnimatePresence mode="wait">
+            {selectedOrder && (
+              <motion.div
+                key="order-details"
+                initial={{ opacity: 0, x: 48 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 48 }}
+                transition={{ type: "spring", damping: 16 }}
+                className="w-full lg:w-1/3 flex-shrink-0"
+              >
+                <OrderDetails
+                  order={selectedOrder}
+                  onClose={() => setSelectedOrder(null)}
+                  onStatusUpdate={handleStatusUpdate}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
       <style jsx global>{`
