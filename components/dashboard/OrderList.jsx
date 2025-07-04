@@ -480,17 +480,17 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium">₹{order.subtotal?.toFixed(2)}</span>
+                    <span className="font-medium text-gray-600">₹{order.subtotal?.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Shipping</span>
                     <span>
-                      {order.shipping === 0 ? (
-                        <span className="text-green-600 font-medium">Free</span>
-                      ) : (
-                        `₹${order.shipping?.toFixed(2)}`
-                      )}
-                    </span>
+  {order.shipping === 0 ? (
+    <span className="text-green-600 font-medium">Free</span>
+  ) : (
+    <span className="text-gray-600">{`₹${order.shipping?.toFixed(2)}`}</span>
+  )}
+</span>
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-purple-100">
                     <span className="font-medium text-gray-900">Total</span>

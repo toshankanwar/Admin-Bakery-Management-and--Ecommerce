@@ -17,7 +17,7 @@ import { addProduct, updateProduct } from '@/firebase/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Constants for styling
-const inputClasses = "mt-2 block w-full rounded-lg border-gray-300 shadow-sm transition-all duration-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:ring-offset-2 placeholder-gray-400";
+const inputClasses = "mt-2 block w-full rounded-lg border-gray-300 shadow-sm transition-all duration-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:ring-offset-2 placeholder-gray-400 text-gray-700";
 const labelClasses = "block text-sm font-medium text-gray-700";
 const fieldGroupClasses = "relative space-y-2 mb-6";
 
