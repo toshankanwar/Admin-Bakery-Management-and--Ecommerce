@@ -10,76 +10,22 @@ import {
   ExclamationCircleIcon,
   ClockIcon,
   CalendarIcon,
-  UserPlusIcon,
-  ShoppingCartIcon,
-  PencilSquareIcon,
-  BellIcon
 } from "@heroicons/react/24/outline";
-import Image from "next/image";
-import { collection, query, getDocs, orderBy, where, onSnapshot, limit } from 'firebase/firestore';
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+  Title,
+} from "chart.js";
+import { collection, query, getDocs, orderBy, where } from 'firebase/firestore';
 import { db } from "@/firebase/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Constants
-const STATS_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds
-const TIME_REFRESH_INTERVAL = 1000; // 1 second in milliseconds
-const getCurrentTimestamp = () => {
-  const now = new Date();
-  return now.toISOString().slice(0, 19).replace('T', ' ');
-};
-
-const CURRENT_TIMESTAMP = '2025-06-17 17:11:01';
-const CURRENT_USER = 'Kala-bot-apk';
-
-const ACTIVITY_TYPES = {
-  USER_SIGNUP: 'USER_SIGNUP',
-  NEW_ORDER: 'NEW_ORDER',
-  PRODUCT_UPDATE: 'PRODUCT_UPDATE'
-};
-
-const formatDateTime = (date) => {
-  const d = new Date(date);
-  
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
-  const seconds = d.getSeconds().toString().padStart(2, '0');
-
-  return {
-    date: `${day}/${month}/${year}`,
-    time: `${hours}:${minutes}:${seconds}`,
-    fullDateTime: `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-  };
-};
-
-const formatRelativeTime = (timestamp) => {
-  const now = new Date();
-  const date = new Date(timestamp);
-  const diffInSeconds = Math.floor((now - date) / 1000);
-
-  if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  if (diffInSeconds < 172800) return 'Yesterday';
-
-  return formatDateTime(date).date;
-};
-
-const useDateTime = () => {
-  const [dateTime, setDateTime] = useState(formatDateTime(new Date()));
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setDateTime(formatDateTime(new Date()));
-    }, TIME_REFRESH_INTERVAL);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  return dateTime;
-};
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend, Title);
 
 const statsItems = [
   {
@@ -112,248 +58,72 @@ const statsItems = [
   },
 ];
 
-const ActivityItem = ({ activity }) => {
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case ACTIVITY_TYPES.USER_SIGNUP:
-        return (
-          <div className="rounded-full bg-blue-100 p-2">
-            <UserPlusIcon className="h-5 w-5 text-blue-600" />
-          </div>
-        );
-      case ACTIVITY_TYPES.NEW_ORDER:
-        return (
-          <div className="rounded-full bg-green-100 p-2">
-            <ShoppingCartIcon className="h-5 w-5 text-green-600" />
-          </div>
-        );
-      case ACTIVITY_TYPES.PRODUCT_UPDATE:
-        return (
-          <div className="rounded-full bg-purple-100 p-2">
-            <PencilSquareIcon className="h-5 w-5 text-purple-600" />
-          </div>
-        );
-      default:
-        return (
-          <div className="rounded-full bg-gray-100 p-2">
-            <BellIcon className="h-5 w-5 text-gray-600" />
-          </div>
-        );
-    }
-  };
+function getStartOfDay(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function getStartOfWeek(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay();
+  // 0: Sunday, so we want Monday as start
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function getStartOfMonth(date = new Date()) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function getMonthName(monthIdx) {
+  return [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ][monthIdx];
+}
+function getDayName(dayIdx) {
+  return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][dayIdx];
+}
+function formatHourLabel(hour) {
+  return `${hour}:00`;
+}
+function getTimeLabels(type) {
+  if (type === "today") return Array.from({ length: 24 }, (_, i) => formatHourLabel(i));
+  if (type === "week") return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  if (type === "month") return [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  return [];
+}
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors"
-    >
-      {getActivityIcon(activity.type)}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">
-          {activity.message}
-        </p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs text-gray-600">
-            {activity.user}
-          </span>
-          <span className="text-xs text-gray-500">•</span>
-          <time dateTime={activity.timestamp} className="text-xs text-gray-500">
-            {formatRelativeTime(activity.timestamp)}
-          </time>
-        </div>
-      </div>
-      {activity.metadata && (
-        <div className="flex-shrink-0">
-          {activity.type === ACTIVITY_TYPES.PRODUCT_UPDATE ? (
-            <div className="w-12 h-12 rounded-lg border border-gray-200 overflow-hidden">
-              <Image
-                src={activity.metadata.imageUrl || '/placeholder-product.jpg'}
-                alt={activity.metadata.name}
-                width={48}
-                height={48}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ) : activity.type === ACTIVITY_TYPES.NEW_ORDER ? (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              ₹{activity.metadata.total}
-            </span>
-          ) : null}
-        </div>
-      )}
-    </motion.div>
-  );
-};
-
-const RecentActivity = () => {
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
+const useDateTime = () => {
+  const [dateTime, setDateTime] = useState({ date: '', time: '' });
 
   useEffect(() => {
-    const unsubscribeCallbacks = [];
-
-    // Listen for new user signups
-    const userSubscription = onSnapshot(
-      query(
-        collection(db, 'users'),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      ),
-      (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === 'added') {
-            const userData = change.doc.data();
-            setActivities((prev) => [
-              {
-                id: change.doc.id,
-                type: ACTIVITY_TYPES.USER_SIGNUP,
-                message: `New user ${userData.displayName || userData.email} joined`,
-                timestamp: userData.createdAt,
-                user: userData.email,
-              },
-              ...prev.filter(a => a.id !== change.doc.id)
-            ].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
-          }
-        });
-      }
-    );
-    unsubscribeCallbacks.push(userSubscription);
-
-    // Listen for new orders
-    const orderSubscription = onSnapshot(
-      query(
-        collection(db, 'orders'),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      ),
-      (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === 'added') {
-            const orderData = change.doc.data();
-            setActivities((prev) => [
-              {
-                id: change.doc.id,
-                type: ACTIVITY_TYPES.NEW_ORDER,
-                message: `New order #${change.doc.id.slice(-6)} placed`,
-                timestamp: orderData.createdAt,
-                user: orderData.userEmail,
-                metadata: {
-                  total: orderData.total,
-                  items: orderData.items.length
-                }
-              },
-              ...prev.filter(a => a.id !== change.doc.id)
-            ].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
-          }
-        });
-      }
-    );
-    unsubscribeCallbacks.push(orderSubscription);
-
-    // Listen for product updates only
-    const productSubscription = onSnapshot(
-      query(
-        collection(db, 'bakeryItems'),
-        orderBy('updatedAt', 'desc'),
-        limit(5)
-      ),
-      (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          const productData = change.doc.data();
-          if (change.type === 'modified') {
-            setActivities((prev) => [
-              {
-                id: change.doc.id,
-                type: ACTIVITY_TYPES.PRODUCT_UPDATE,
-                message: `Product "${productData.name}" updated`,
-                timestamp: productData.updatedAt,
-                user: productData.updatedBy || CURRENT_USER,
-                metadata: {
-                  name: productData.name,
-                  imageUrl: productData.imageUrl
-                }
-              },
-              ...prev.filter(a => a.id !== change.doc.id)
-            ].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
-          }
-        });
-      }
-    );
-    unsubscribeCallbacks.push(productSubscription);
-
-    setLoading(false);
-
-    return () => {
-      unsubscribeCallbacks.forEach(unsubscribe => unsubscribe());
+    const update = () => {
+      const now = new Date();
+      setDateTime({
+        date: now.toLocaleDateString(),
+        time: now.toLocaleTimeString(),
+      });
     };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4 }}
-      className="bg-white rounded-2xl shadow-lg overflow-hidden"
-    >
-      <div className="p-6 border-b border-gray-100">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Recent Activity
-          </h2>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-            Live Updates
-          </span>
-        </div>
-      </div>
-
-      <div className="divide-y divide-gray-100">
-        {loading ? (
-          <div className="p-6 space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : activities.length === 0 ? (
-          <div className="p-12 text-center">
-            <BellIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No activity yet</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              New activities will appear here as they happen.
-            </p>
-          </div>
-        ) : (
-          <div className="max-h-[400px] overflow-y-auto">
-            {activities.map((activity) => (
-              <ActivityItem key={activity.id} activity={activity} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {activities.length > 0 && (
-        <div className="p-4 bg-gray-50 border-t border-gray-100">
-          <button
-            onClick={() => {/* Implement view all logic */}}
-            className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-          >
-            View all activity
-          </button>
-        </div>
-      )}
-    </motion.div>
-  );
+  return dateTime;
 };
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const { date, time, fullDateTime } = useDateTime();
+  const { date, time } = useDateTime();
+
+  // Stats
   const [stats, setStats] = useState({
     revenue: 0,
     orders: 0,
@@ -362,98 +132,244 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastFetchTime, setLastFetchTime] = useState(null);
 
-  const fetchDashboardStats = async () => {
-    if (!user) return;
-    
-    try {
+  // Advanced Analytics
+  const [period, setPeriod] = useState("today"); // today | week | month
+  const [topItems, setTopItems] = useState([]);
+  const [topCustomers, setTopCustomers] = useState([]);
+  const [newUsers, setNewUsers] = useState(0);
+  const [ordersCount, setOrdersCount] = useState(0);
+  const [revenue, setRevenue] = useState(0);
+  const [customerSegments, setCustomerSegments] = useState({
+    topByOrders: [],
+    topBySpend: [],
+    inactive: [],
+  });
+  const [allTimeTopItems, setAllTimeTopItems] = useState([]);
+
+  // Analytics Bar Chart Data
+  const [itemChartData, setItemChartData] = useState({ labels: [], datasets: [] });
+  const [customerChartData, setCustomerChartData] = useState({ labels: [], datasets: [] });
+  const [ordersChartData, setOrdersChartData] = useState({ labels: [], datasets: [] });
+  const [revenueChartData, setRevenueChartData] = useState({ labels: [], datasets: [] });
+
+  // Helpers to get period range
+  function getPeriodRange(type) {
+    const now = new Date();
+    if (type === "today") {
+      const start = getStartOfDay(now);
+      const end = new Date(start); end.setDate(start.getDate() + 1);
+      return { start, end, labels: getTimeLabels("today") };
+    }
+    if (type === "week") {
+      const start = getStartOfWeek(now);
+      const end = new Date(start); end.setDate(start.getDate() + 7);
+      return { start, end, labels: getTimeLabels("week") };
+    }
+    if (type === "month") {
+      const year = now.getFullYear();
+      const start = new Date(year, 0, 1);
+      const end = new Date(year + 1, 0, 1);
+      return { start, end, labels: getTimeLabels("month") };
+    }
+    return { start: now, end: now, labels: [] };
+  }
+
+  // Main data fetching effect
+  useEffect(() => {
+    if (!authLoading && user) {
       setLoading(true);
       setError(null);
-  
-      // Create basic queries without complex where clauses
-      const ordersRef = collection(db, 'orders');
-      const productsRef = collection(db, 'bakeryItems');
-      const customersRef = collection(db, 'users');
-  
-      try {
-        // Get all orders first
-        const ordersSnapshot = await getDocs(query(ordersRef, orderBy('createdAt', 'desc')));
-        
-        // Calculate stats from the snapshots
+
+      // Fetch all required collections in parallel
+      Promise.all([
+        getDocs(collection(db, 'orders')),
+        getDocs(collection(db, 'bakeryItems')),
+        getDocs(collection(db, 'users')),
+      ]).then(([ordersSnap, productsSnap, usersSnap]) => {
+        // --- Basic Stats ---
+        // Only count delivered orders for revenue, and non-cancelled for count
         let totalRevenue = 0;
-        let activeOrders = 0;
-  
-        ordersSnapshot.forEach(doc => {
+        let totalOrders = 0;
+        ordersSnap.forEach(doc => {
           const order = doc.data();
-          if (order && order.orderStatus) {
-            // Count non-cancelled orders
-            if (order.orderStatus !== 'cancelled') {
-              activeOrders++;
-            }
-            // Sum revenue from delivered orders
-            if (order.orderStatus === 'delivered' && order.total) {
-              totalRevenue += Number(order.total) || 0;
-            }
+          if (order.orderStatus !== 'cancelled') totalOrders++;
+          if (order.orderStatus === 'delivered' && order.total) {
+            totalRevenue += Number(order.total) || 0;
           }
         });
-  
-        // Get products and customers count
-        const [productsSnapshot, customersSnapshot] = await Promise.all([
-          getDocs(query(productsRef, where('inStock', '==', true))),
-          getDocs(query(customersRef, where('role', '==', 'user')))
-        ]);
-  
+        // Only active products
+        const activeProducts = productsSnap.docs.filter(doc => doc.data().inStock).length;
+        // Only normal users
+        const customerCount = usersSnap.docs.filter(doc => doc.data().role === 'user').length;
+
         setStats({
           revenue: totalRevenue,
-          orders: activeOrders,
-          products: productsSnapshot.size,
-          customers: customersSnapshot.size
+          orders: totalOrders,
+          products: activeProducts,
+          customers: customerCount,
         });
-  
-        setLastFetchTime(new Date());
-  
-      } catch (queryError) {
-        console.error("Query execution error:", {
-          error: queryError.message,
-          code: queryError.code,
-          timestamp: '2025-06-17 17:19:16',
-          user: 'Kala-bot-apk'
+
+        // --- Analytics by period ---
+        const { start, end, labels } = getPeriodRange(period);
+        // 1. Filter orders in the period (delivered only for analytics)
+        let periodOrders = [];
+        ordersSnap.forEach(doc => {
+          const order = doc.data();
+          if (!order.createdAt || ['cancelled', 'pending'].includes(order.orderStatus)) return;
+          const createdAt = order.createdAt.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+          if (createdAt >= start && createdAt < end) {
+            periodOrders.push({ ...order, createdAt });
+          }
         });
-        throw queryError;
-      }
+        // --- All Time Top Items (excluding 'failed' and 'pending') ---
+const allDeliveredOrders = ordersSnap.docs
+.map(doc => doc.data())
+.filter(order => order.orderStatus !== 'cancelled' && order.orderStatus !== 'pending');
+
+const allItemStats = {};
+allDeliveredOrders.forEach(order => {
+(order.items || []).forEach(item => {
+  if (!allItemStats[item.name]) allItemStats[item.name] = 0;
+  allItemStats[item.name] += Number(item.quantity) || 1;
+});
+});
+const allTop5 = Object.entries(allItemStats)
+.sort((a, b) => b[1] - a[1])
+.slice(0, 5);
+setAllTimeTopItems(allTop5);
+
+
+        // --- Orders and Revenue Chart Data by Time ---
+        let ordersByTime = Array(labels.length).fill(0);
+        let revenueByTime = Array(labels.length).fill(0);
+
+        periodOrders.forEach(order => {
+          let idx = 0;
+          if (period === "today") {
+            idx = order.createdAt.getHours();
+          } else if (period === "week") {
+            // Monday=0, ..., Sunday=6, getDay: Sunday=0, ..., Saturday=6
+            let day = order.createdAt.getDay();
+            idx = (day + 6) % 7; // shift Sun=0 -> 6, Mon=1 -> 0, etc.
+          } else if (period === "month") {
+            idx = order.createdAt.getMonth();
+          }
+          ordersByTime[idx]++;
+          revenueByTime[idx] += Number(order.total) || 0;
+        });
+
+        setOrdersChartData({
+          labels,
+          datasets: [{
+            label: "Orders",
+            data: ordersByTime,
+            backgroundColor: "#a78bfa",
+          }]
+        });
+
+        setRevenueChartData({
+          labels,
+          datasets: [{
+            label: "Revenue (₹)",
+            data: revenueByTime,
+            backgroundColor: "#8b5cf6",
+          }]
+        });
+
+        setOrdersCount(periodOrders.length);
+        setRevenue(periodOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0));
+
+        // --- Top 5 Products (by quantity ordered) ---
+        const itemStats = {};
+        periodOrders.forEach(order => {
+          (order.items || []).forEach(item => {
+            if (!itemStats[item.name]) itemStats[item.name] = 0;
+            itemStats[item.name] += Number(item.quantity) || 1;
+          });
+        });
+        const top5 = Object.entries(itemStats)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+        setTopItems(top5);
+
+        setItemChartData({
+          labels: top5.map(([name]) => name),
+          datasets: [{
+            label: "Items Ordered",
+            data: top5.map(([, qty]) => qty),
+            backgroundColor: "#f472b6",
+          }]
+        });
+
+        // --- Top 5 Customers (by spend) ---
+        const customerStats = {};
+        periodOrders.forEach(order => {
+          if (!order.userEmail) return;
+          if (!customerStats[order.userEmail]) customerStats[order.userEmail] = { spend: 0, items: 0 };
+          customerStats[order.userEmail].spend += Number(order.total) || 0;
+          customerStats[order.userEmail].items += (order.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0);
+        });
+        const top5Customers = Object.entries(customerStats)
+          .sort((a, b) => b[1].spend - a[1].spend)
+          .slice(0, 5);
+        setTopCustomers(top5Customers);
+
+        setCustomerChartData({
+          labels: top5Customers.map(([email]) => email),
+          datasets: [{
+            label: "Total Spend (₹)",
+            data: top5Customers.map(([, v]) => v.spend),
+            backgroundColor: "#fbbf24",
+          }]
+        });
+
+        // --- New Users Joined ---
+        let usersInPeriod = usersSnap.docs.filter(doc => {
+          const user = doc.data();
+          if (!user.createdAt) return false;
+          const createdAt = user.createdAt.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
+          return createdAt >= start && createdAt < end;
+        });
+        setNewUsers(usersInPeriod.length);
+
+        // --- User Segmentation ---
+        // For all time, get users who have placed orders, and their stats
+        const allOrders = ordersSnap.docs
+          .map(doc => doc.data())
+          .filter(o => o.userEmail && o.orderStatus !== "cancelled");
+
+        const buyers = {};
+        allOrders.forEach(order => {
+          if (!buyers[order.userEmail]) buyers[order.userEmail] = { orders: 0, spend: 0, items: 0 };
+          buyers[order.userEmail].orders++;
+          buyers[order.userEmail].spend += Number(order.total) || 0;
+          buyers[order.userEmail].items += (order.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0);
+        });
+
+        // Top by orders
+        const topByOrders = Object.entries(buyers).sort((a, b) => b[1].orders - a[1].orders).slice(0, 5);
+        // Top by spend
+        const topBySpend = Object.entries(buyers).sort((a, b) => b[1].spend - a[1].spend).slice(0, 5);
+
+        // Users with no orders
+        const allUserEmails = usersSnap.docs.filter(doc => doc.data().role === "user").map(doc => doc.data().email);
+        const inactive = allUserEmails.filter(email => !(email in buyers));
+
+        setCustomerSegments({
+          topByOrders,
+          topBySpend,
+          inactive,
+        });
+
+        setLoading(false);
+      }).catch(error => {
+        setError("Failed to load dashboard statistics. Please try again.");
+        setLoading(false);
+      });
+    }
+  }, [user, authLoading, period]);
   
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", {
-        error: error.message,
-        stack: error.stack,
-        timestamp: '2025-06-17 17:19:16',
-        user: user?.email || 'Kala-bot-apk'
-      });
-      setError("Failed to load dashboard statistics. Please try again.");
-      setStats({
-        revenue: 0,
-        orders: 0,
-        products: 0,
-        customers: 0
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => {
-    if (!authLoading && (!lastFetchTime || new Date() - lastFetchTime > STATS_REFRESH_INTERVAL)) {
-      fetchDashboardStats();
-    }
-
-    const intervalId = setInterval(() => {
-      if (!authLoading && user) {
-        fetchDashboardStats();
-      }
-    }, STATS_REFRESH_INTERVAL);
-
-    return () => clearInterval(intervalId);
-  }, [user, authLoading]);
 
   if (error) {
     return (
@@ -468,7 +384,7 @@ export default function DashboardPage() {
             <span className="ml-3 text-red-800">{error}</span>
           </div>
           <button
-            onClick={() => fetchDashboardStats()}
+            onClick={() => window.location.reload()}
             className="mt-4 text-sm text-red-600 hover:text-red-500"
           >
             Retry
@@ -481,13 +397,14 @@ export default function DashboardPage() {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
         >
           <h1 className="text-3xl font-bold text-gray-900">
-            Dashboard Overview
+            Advanced Analytics Overview
           </h1>
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4">
             <div className="flex items-center bg-white px-4 py-2 rounded-lg shadow-sm">
@@ -505,6 +422,7 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {statsItems.map((item, index) => (
             <motion.div
@@ -541,7 +459,313 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <RecentActivity />
+        {/* Analytics Period Selector */}
+        <div className="flex gap-4 my-6">
+          {["today", "week", "month"].map((val) => (
+            <button
+              key={val}
+              onClick={() => setPeriod(val)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold shadow transition 
+                ${period === val ? "bg-purple-600 text-white" : "bg-white text-gray-900 hover:bg-purple-100"}`}
+            >
+              {val === "today" ? "Today" : val === "week" ? "This Week" : "This Year"}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
+          {/* Orders */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Orders Over {period === "today" ? "Today (Hourly)" : period === "week" ? "This Week (Daily)" : "This Year (Monthly)"}
+            </h2>
+            <Bar data={ordersChartData}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { display: false },
+                  title: { display: false }
+                },
+                scales: {
+                  y: { beginAtZero: true },
+                }
+              }}
+              height={220}
+            />
+            <div className="mt-4 text-sm text-gray-500">
+              Orders: <span className="font-bold text-gray-700">{ordersCount}</span>
+            </div>
+          </motion.div>
+
+          {/* Revenue */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Revenue Over {period === "today" ? "Today (Hourly)" : period === "week" ? "This Week (Daily)" : "This Year (Monthly)"}
+            </h2>
+            <Bar data={revenueChartData}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { display: false },
+                  title: { display: false }
+                },
+                scales: {
+                  y: { beginAtZero: true },
+                }
+              }}
+              height={220}
+            />
+            <div className="mt-4 text-sm text-gray-500">
+              Revenue: <span className="font-bold text-gray-700">₹{revenue.toFixed(2)}</span>
+            </div>
+          </motion.div>
+        </div>
+        {/* Advanced Analytics Section */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {/* Top 5 Items */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Top 5 Most Ordered Bakery Items ({period === "today" ? "Today" : period === "week" ? "This Week" : "This Year"})
+            </h2>
+            <Bar data={itemChartData}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { display: false },
+                  title: { display: false }
+                },
+                scales: {
+                  y: { beginAtZero: true },
+                }
+              }}
+              height={260}
+            />
+            <ul className="mt-4 space-y-2">
+              {topItems.map(([name, qty], i) => (
+                <li key={name} className="flex justify-between">
+                  <span className="font-medium">{i + 1}. {name}</span>
+                  <span className="text-purple-600">{qty} ordered</span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+          <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="bg-white rounded-2xl p-6 shadow"
+>
+  <h2 className="text-lg font-bold mb-4 text-gray-800">
+    Top 5 Most Ordered Bakery Items (All Time)
+  </h2>
+  <Bar
+    data={{
+      labels: allTimeTopItems.map(([name]) => name),
+      datasets: [
+        {
+          label: "Orders",
+          data: allTimeTopItems.map(([, qty]) => qty),
+          backgroundColor: "#f472b6",
+        },
+      ],
+    }}
+    options={{
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        title: { display: false },
+      },
+      scales: {
+        y: { beginAtZero: true },
+      },
+    }}
+    height={260}
+  />
+    <ul className="mt-4 space-y-2">
+              {allTimeTopItems.map(([name, qty], i) => (
+                <li key={name} className="flex justify-between">
+                  <span className="font-medium">{i + 1}. {name}</span>
+                  <span className="text-purple-600">{qty} ordered</span>
+                </li>
+              ))}
+            </ul>
+</motion.div>
+          
+
+          {/* Top 5 Customers */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Top 5 Customers ({period === "today" ? "Today" : period === "week" ? "This Week" : "This Year"})
+            </h2>
+            <Bar data={customerChartData}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { display: false },
+                  title: { display: false }
+                },
+                scales: {
+                  y: { beginAtZero: true },
+                }
+              }}
+              height={260}
+            />
+            <ul className="mt-4 space-y-2">
+              {topCustomers.map(([email, { spend }], i) => (
+                <li key={email} className="flex justify-between">
+                  <span className="font-medium">{i + 1}. {email}</span>
+                  <span className="text-amber-600">₹{spend.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        </div>
+
+        {/* Orders and Revenue over Time */}
+       
+
+        {/* New Users, User Segmentation */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
+          {/* New Users */}
+    
+
+
+{/* Top 5 by Orders */}
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="bg-white rounded-2xl p-6 shadow"
+>
+  <h2 className="text-lg font-bold mb-4 text-gray-800">
+    Top 5 Customers by Orders (All Time)
+  </h2>
+  <Bar
+    data={{
+      labels: customerSegments.topByOrders.map(([email]) => email),
+      datasets: [
+        {
+          label: 'Orders',
+          data: customerSegments.topByOrders.map(([, stats]) => stats.orders),
+          backgroundColor: '#8b5cf6',
+        },
+      ],
+    }}
+    options={{
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } },
+      },
+    }}
+  />
+</motion.div>
+
+{/* Top 5 by Spend */}
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="bg-white rounded-2xl p-6 shadow"
+>
+  <h2 className="text-lg font-bold mb-4 text-gray-800">
+    Top 5 Customers by Spend (All Time)
+  </h2>
+  <Bar
+    data={{
+      labels: customerSegments.topBySpend.map(([email]) => email),
+      datasets: [
+        {
+          label: 'Spend (₹)',
+          data: customerSegments.topBySpend.map(([, stats]) => stats.spend),
+          backgroundColor: '#f59e0b',
+        },
+      ],
+    }}
+    options={{
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function (value) {
+              return '₹' + value;
+            },
+          },
+        },
+      },
+    }}
+  />
+</motion.div>
+
+{/* Inactive Users (Bar chart showing inactive count per period, optional customization) */}
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="bg-white rounded-2xl p-6 shadow"
+>
+  <h2 className="text-lg font-bold mb-4 text-gray-800">
+    Inactive Customers (All Time)
+  </h2>
+  <Bar
+    data={{
+      labels: customerSegments.inactive.slice(0, 5),
+      datasets: [
+        {
+          label: 'Inactive (no orders)',
+          data: Array(Math.min(5, customerSegments.inactive.length)).fill(1),
+          backgroundColor: '#9ca3af',
+        },
+      ],
+    }}
+    options={{
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0,
+            stepSize: 1,
+          },
+        },
+      },
+    }}
+  />
+  {customerSegments.inactive.length > 5 && (
+    <p className="mt-2 text-gray-400 text-sm">
+      +{customerSegments.inactive.length - 5} more inactive customers
+    </p>
+  )}
+</motion.div>
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="bg-white rounded-2xl p-6 shadow"
+>
+  <h2 className="text-lg font-bold mb-4 text-gray-800">
+    New Users {period === "today" ? "Today" : period === "week" ? "This Week" : "This Year"}
+  </h2>
+  <div className="flex items-center space-x-4">
+    <div className="text-4xl font-bold text-purple-600">{newUsers}</div>
+    <span className="text-gray-500">joined</span>
+  </div>
+</motion.div>
+
+        </div>
       </div>
     </div>
   );
