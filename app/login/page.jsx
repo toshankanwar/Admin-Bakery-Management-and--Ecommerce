@@ -82,6 +82,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -93,6 +94,13 @@ export default function LoginPage() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Sign in to access the admin dashboard
+          </p>
+        </div>
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-sm text-yellow-800 rounded-md shadow">
+          <p>
+            <strong>Demo Credentials:</strong><br />
+            <span>Email:</span> <code>toshan22102@iiitnr.edu.in</code><br />
+            <span>Password:</span> <code>hellohii@12345</code>
           </p>
         </div>
 
@@ -178,17 +186,6 @@ export default function LoginPage() {
           </div>
         </form>
 
-        <div className="mt-6">
-          <p className="text-center text-sm text-gray-600">
-            Forgot your password?{' '}
-            <button
-              onClick={() => {/* Implement password reset */}}
-              className="font-medium text-purple-600 hover:text-purple-500"
-            >
-              Reset it here
-            </button>
-          </p>
-        </div>
       </motion.div>
     </div>
   );
