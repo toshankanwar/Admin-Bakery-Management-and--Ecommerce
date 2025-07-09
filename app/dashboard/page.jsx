@@ -21,7 +21,7 @@ import {
   Legend,
   Title,
 } from "chart.js";
-import { collection, query, getDocs, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from "@/firebase/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -78,22 +78,22 @@ function getStartOfMonth(date = new Date()) {
   d.setHours(0, 0, 0, 0);
   return d;
 }
-function getMonthName(monthIdx) {
-  return [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ][monthIdx];
+function getStartOfYear(date = new Date()) {
+  const d = new Date(date);
+  d.setMonth(0, 1); // January 1st
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
-function getDayName(dayIdx) {
-  return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][dayIdx];
-}
-function formatHourLabel(hour) {
-  return `${hour}:00`;
-}
+
 function getTimeLabels(type) {
-  if (type === "today") return Array.from({ length: 24 }, (_, i) => formatHourLabel(i));
+  if (type === "today") return Array.from({ length: 24 }, (_, i) => `${i}:00`);
   if (type === "week") return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  if (type === "month") return [
+  if (type === "month") {
+    const now = new Date();
+    const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return Array.from({ length: days }, (_, i) => (i + 1).toString());
+  }
+  if (type === "year") return [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
@@ -119,6 +119,41 @@ const useDateTime = () => {
   return dateTime;
 };
 
+// Helper for per-time-unit most ordered bakery item
+function getPerTimeMostOrderedItem(periodOrdersAll, period, labels) {
+  // Map: [time unit idx] -> { [itemName]: qty }
+  const perTimeMap = Array(labels.length).fill(0).map(() => ({}));
+  periodOrdersAll.forEach(order => {
+    let idx = 0;
+    if (period === "today") {
+      idx = order.createdAt.getHours();
+    } else if (period === "week") {
+      let day = order.createdAt.getDay();
+      idx = (day + 6) % 7;
+    } else if (period === "month") {
+      idx = order.createdAt.getDate() - 1;
+    } else if (period === "year") {
+      idx = order.createdAt.getMonth();
+    }
+    (order.items || []).forEach(item => {
+      if (!perTimeMap[idx][item.name]) perTimeMap[idx][item.name] = 0;
+      perTimeMap[idx][item.name] += Number(item.quantity) || 1;
+    });
+  });
+
+  // For each time unit idx, get the item name with max qty
+  return perTimeMap.map(obj => {
+    let maxItem = null, maxQty = 0;
+    for (const [item, qty] of Object.entries(obj)) {
+      if (qty > maxQty) {
+        maxQty = qty;
+        maxItem = item;
+      }
+    }
+    return { item: maxItem, qty: maxQty };
+  });
+}
+
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const { date, time } = useDateTime();
@@ -133,27 +168,32 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Analytics period: today | week | month | year
+  const [period, setPeriod] = useState("today");
   // Advanced Analytics
-  const [period, setPeriod] = useState("today"); // today | week | month
   const [topItems, setTopItems] = useState([]);
+  const [allTimeTopItems, setAllTimeTopItems] = useState([]);
+  const [topItemsChart, setTopItemsChart] = useState({ labels: [], datasets: [] });
+  const [allTimeTopItemsChart, setAllTimeTopItemsChart] = useState({ labels: [], datasets: [] });
   const [topCustomers, setTopCustomers] = useState([]);
-  const [newUsers, setNewUsers] = useState(0);
+  const [customerChartData, setCustomerChartData] = useState({ labels: [], datasets: [] });
+  const [ordersChartData, setOrdersChartData] = useState({ labels: [], datasets: [] });
+  const [revenueChartData, setRevenueChartData] = useState({ labels: [], datasets: [] });
   const [ordersCount, setOrdersCount] = useState(0);
   const [revenue, setRevenue] = useState(0);
+  const [newUsersBarData, setNewUsersBarData] = useState({ labels: [], datasets: [] });
+  const [newUsersTotal, setNewUsersTotal] = useState(0);
   const [customerSegments, setCustomerSegments] = useState({
     topByOrders: [],
     topBySpend: [],
     inactive: [],
   });
-  const [allTimeTopItems, setAllTimeTopItems] = useState([]);
 
-  // Analytics Bar Chart Data
-  const [itemChartData, setItemChartData] = useState({ labels: [], datasets: [] });
-  const [customerChartData, setCustomerChartData] = useState({ labels: [], datasets: [] });
-  const [ordersChartData, setOrdersChartData] = useState({ labels: [], datasets: [] });
-  const [revenueChartData, setRevenueChartData] = useState({ labels: [], datasets: [] });
+  // Per-time-unit analytics for most ordered bakery item
+  const [perTimeMostOrdered, setPerTimeMostOrdered] = useState([]);
+  const [perTimeMostOrderedChart, setPerTimeMostOrderedChart] = useState({ labels: [], datasets: [] });
 
-  // Helpers to get period range
+  // Helpers to get period range and time labels
   function getPeriodRange(type) {
     const now = new Date();
     if (type === "today") {
@@ -167,28 +207,33 @@ export default function DashboardPage() {
       return { start, end, labels: getTimeLabels("week") };
     }
     if (type === "month") {
-      const year = now.getFullYear();
-      const start = new Date(year, 0, 1);
-      const end = new Date(year + 1, 0, 1);
+      const now = new Date();
+      const start = getStartOfMonth(now);
+      const end = new Date(start);
+      end.setMonth(start.getMonth() + 1);
       return { start, end, labels: getTimeLabels("month") };
+    }
+    if (type === "year") {
+      const now = new Date();
+      const start = getStartOfYear(now);
+      const end = new Date(start);
+      end.setFullYear(start.getFullYear() + 1);
+      return { start, end, labels: getTimeLabels("year") };
     }
     return { start: now, end: now, labels: [] };
   }
 
-  // Main data fetching effect
   useEffect(() => {
     if (!authLoading && user) {
       setLoading(true);
       setError(null);
 
-      // Fetch all required collections in parallel
       Promise.all([
         getDocs(collection(db, 'orders')),
         getDocs(collection(db, 'bakeryItems')),
         getDocs(collection(db, 'users')),
       ]).then(([ordersSnap, productsSnap, usersSnap]) => {
         // --- Basic Stats ---
-        // Only count delivered orders for revenue, and non-cancelled for count
         let totalRevenue = 0;
         let totalOrders = 0;
         ordersSnap.forEach(doc => {
@@ -198,9 +243,7 @@ export default function DashboardPage() {
             totalRevenue += Number(order.total) || 0;
           }
         });
-        // Only active products
         const activeProducts = productsSnap.docs.filter(doc => doc.data().inStock).length;
-        // Only normal users
         const customerCount = usersSnap.docs.filter(doc => doc.data().role === 'user').length;
 
         setStats({
@@ -212,50 +255,86 @@ export default function DashboardPage() {
 
         // --- Analytics by period ---
         const { start, end, labels } = getPeriodRange(period);
-        // 1. Filter orders in the period (delivered only for analytics)
-        let periodOrders = [];
+
+        // Orders in period (delivered for revenue, all except cancelled for all analytics except revenue)
+        let periodOrdersRevenue = [];
+        let periodOrdersAll = [];
         ordersSnap.forEach(doc => {
           const order = doc.data();
-          if (!order.createdAt || ['cancelled', 'pending'].includes(order.orderStatus)) return;
+          if (!order.createdAt) return;
           const createdAt = order.createdAt.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
           if (createdAt >= start && createdAt < end) {
-            periodOrders.push({ ...order, createdAt });
+            if (order.orderStatus === 'delivered') {
+              periodOrdersRevenue.push({ ...order, createdAt });
+            }
+            if (order.orderStatus !== 'cancelled') {
+              periodOrdersAll.push({ ...order, createdAt });
+            }
           }
         });
-        // --- All Time Top Items (excluding 'failed' and 'pending') ---
-const allDeliveredOrders = ordersSnap.docs
-.map(doc => doc.data())
-.filter(order => order.orderStatus !== 'cancelled' && order.orderStatus !== 'pending');
 
-const allItemStats = {};
-allDeliveredOrders.forEach(order => {
-(order.items || []).forEach(item => {
-  if (!allItemStats[item.name]) allItemStats[item.name] = 0;
-  allItemStats[item.name] += Number(item.quantity) || 1;
-});
-});
-const allTop5 = Object.entries(allItemStats)
-.sort((a, b) => b[1] - a[1])
-.slice(0, 5);
-setAllTimeTopItems(allTop5);
+        // All time delivered orders for allTimeTopItems
+        const allDeliveredOrders = ordersSnap.docs
+          .map(doc => doc.data())
+          .filter(order => order.orderStatus === 'delivered');
+        // All time non-cancelled orders for stats/analytics
+        const allNonCancelledOrders = ordersSnap.docs
+          .map(doc => doc.data())
+          .filter(order => order.orderStatus !== 'cancelled');
 
+        // --- All Time Top Items (by quantity) ---
+        const allItemStats = {};
+        allDeliveredOrders.forEach(order => {
+          (order.items || []).forEach(item => {
+            if (!allItemStats[item.name]) allItemStats[item.name] = 0;
+            allItemStats[item.name] += Number(item.quantity) || 1;
+          });
+        });
+        const allTop5 = Object.entries(allItemStats)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+        setAllTimeTopItems(allTop5);
+        setAllTimeTopItemsChart({
+          labels: allTop5.map(([name]) => name),
+          datasets: [{
+            label: "Orders",
+            data: allTop5.map(([, qty]) => qty),
+            backgroundColor: "#f472b6",
+          }]
+        });
 
         // --- Orders and Revenue Chart Data by Time ---
         let ordersByTime = Array(labels.length).fill(0);
         let revenueByTime = Array(labels.length).fill(0);
 
-        periodOrders.forEach(order => {
+        // For orders: use all except cancelled; for revenue: only delivered
+        periodOrdersAll.forEach(order => {
           let idx = 0;
           if (period === "today") {
             idx = order.createdAt.getHours();
           } else if (period === "week") {
-            // Monday=0, ..., Sunday=6, getDay: Sunday=0, ..., Saturday=6
             let day = order.createdAt.getDay();
-            idx = (day + 6) % 7; // shift Sun=0 -> 6, Mon=1 -> 0, etc.
+            idx = (day + 6) % 7;
           } else if (period === "month") {
+            idx = order.createdAt.getDate() - 1;
+          } else if (period === "year") {
             idx = order.createdAt.getMonth();
           }
           ordersByTime[idx]++;
+        });
+
+        periodOrdersRevenue.forEach(order => {
+          let idx = 0;
+          if (period === "today") {
+            idx = order.createdAt.getHours();
+          } else if (period === "week") {
+            let day = order.createdAt.getDay();
+            idx = (day + 6) % 7;
+          } else if (period === "month") {
+            idx = order.createdAt.getDate() - 1;
+          } else if (period === "year") {
+            idx = order.createdAt.getMonth();
+          }
           revenueByTime[idx] += Number(order.total) || 0;
         });
 
@@ -277,12 +356,12 @@ setAllTimeTopItems(allTop5);
           }]
         });
 
-        setOrdersCount(periodOrders.length);
-        setRevenue(periodOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0));
+        setOrdersCount(periodOrdersAll.length);
+        setRevenue(periodOrdersRevenue.reduce((sum, o) => sum + (Number(o.total) || 0), 0));
 
-        // --- Top 5 Products (by quantity ordered) ---
+        // --- Top 5 Products (by quantity ordered) for period ---
         const itemStats = {};
-        periodOrders.forEach(order => {
+        periodOrdersAll.forEach(order => {
           (order.items || []).forEach(item => {
             if (!itemStats[item.name]) itemStats[item.name] = 0;
             itemStats[item.name] += Number(item.quantity) || 1;
@@ -292,8 +371,7 @@ setAllTimeTopItems(allTop5);
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5);
         setTopItems(top5);
-
-        setItemChartData({
+        setTopItemsChart({
           labels: top5.map(([name]) => name),
           datasets: [{
             label: "Items Ordered",
@@ -302,9 +380,9 @@ setAllTimeTopItems(allTop5);
           }]
         });
 
-        // --- Top 5 Customers (by spend) ---
+        // --- Top 5 Customers (by spend) for period ---
         const customerStats = {};
-        periodOrders.forEach(order => {
+        periodOrdersAll.forEach(order => {
           if (!order.userEmail) return;
           if (!customerStats[order.userEmail]) customerStats[order.userEmail] = { spend: 0, items: 0 };
           customerStats[order.userEmail].spend += Number(order.total) || 0;
@@ -324,20 +402,58 @@ setAllTimeTopItems(allTop5);
           }]
         });
 
-        // --- New Users Joined ---
+        // --- New Users (by time unit for period) ---
         let usersInPeriod = usersSnap.docs.filter(doc => {
           const user = doc.data();
           if (!user.createdAt) return false;
           const createdAt = user.createdAt.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
           return createdAt >= start && createdAt < end;
         });
-        setNewUsers(usersInPeriod.length);
 
-        // --- User Segmentation ---
-        // For all time, get users who have placed orders, and their stats
+        // New users bar by time unit (hour/day/month)
+        let newUsersByTime = Array(labels.length).fill(0);
+        usersInPeriod.forEach(userDoc => {
+          const user = userDoc.data();
+          let createdAt = user.createdAt.toDate ? user.createdAt.toDate() : new Date(user.createdAt);
+          let idx = 0;
+          if (period === "today") {
+            idx = createdAt.getHours();
+          } else if (period === "week") {
+            let day = createdAt.getDay();
+            idx = (day + 6) % 7;
+          } else if (period === "month") {
+            idx = createdAt.getDate() - 1;
+          } else if (period === "year") {
+            idx = createdAt.getMonth();
+          }
+          newUsersByTime[idx]++;
+        });
+        setNewUsersBarData({
+          labels,
+          datasets: [{
+            label: "New Users",
+            data: newUsersByTime,
+            backgroundColor: "#10b981",
+          }]
+        });
+        setNewUsersTotal(usersInPeriod.length);
+
+        // --- Per-time-unit most ordered bakery item for the current period ---
+        const perTimeMost = getPerTimeMostOrderedItem(periodOrdersAll, period, labels);
+        setPerTimeMostOrdered(perTimeMost);
+        setPerTimeMostOrderedChart({
+          labels,
+          datasets: [{
+            label: "Most Ordered Item (Qty)",
+            data: perTimeMost.map(mo => mo.qty || 0),
+            backgroundColor: "#f59e42",
+          }]
+        });
+
+        // --- User Segmentation (All Time) ---
         const allOrders = ordersSnap.docs
           .map(doc => doc.data())
-          .filter(o => o.userEmail && o.orderStatus !== "cancelled");
+          .filter(o => o.userEmail && o.orderStatus === "delivered");
 
         const buyers = {};
         allOrders.forEach(order => {
@@ -346,20 +462,12 @@ setAllTimeTopItems(allTop5);
           buyers[order.userEmail].spend += Number(order.total) || 0;
           buyers[order.userEmail].items += (order.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0);
         });
-
-        // Top by orders
         const topByOrders = Object.entries(buyers).sort((a, b) => b[1].orders - a[1].orders).slice(0, 5);
-        // Top by spend
         const topBySpend = Object.entries(buyers).sort((a, b) => b[1].spend - a[1].spend).slice(0, 5);
-
-        // Users with no orders
-        const allUserEmails = usersSnap.docs.filter(doc => doc.data().role === "user").map(doc => doc.data().email);
-        const inactive = allUserEmails.filter(email => !(email in buyers));
-
         setCustomerSegments({
           topByOrders,
           topBySpend,
-          inactive,
+          inactive: [],
         });
 
         setLoading(false);
@@ -369,7 +477,6 @@ setAllTimeTopItems(allTop5);
       });
     }
   }, [user, authLoading, period]);
-  
 
   if (error) {
     return (
@@ -430,7 +537,7 @@ setAllTimeTopItems(allTop5);
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              whileHover={{ 
+              whileHover={{
                 scale: 1.02,
                 transition: { duration: 0.2 }
               }}
@@ -461,14 +568,14 @@ setAllTimeTopItems(allTop5);
 
         {/* Analytics Period Selector */}
         <div className="flex gap-4 my-6">
-          {["today", "week", "month"].map((val) => (
+          {["today", "week", "month", "year"].map((val) => (
             <button
               key={val}
               onClick={() => setPeriod(val)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold shadow transition 
                 ${period === val ? "bg-purple-600 text-white" : "bg-white text-gray-900 hover:bg-purple-100"}`}
             >
-              {val === "today" ? "Today" : val === "week" ? "This Week" : "This Year"}
+              {val === "today" ? "Today" : val === "week" ? "This Week" : val === "month" ? "This Month" : "This Year"}
             </button>
           ))}
         </div>
@@ -480,7 +587,7 @@ setAllTimeTopItems(allTop5);
             className="bg-white rounded-2xl p-6 shadow"
           >
             <h2 className="text-lg font-bold mb-4 text-gray-800">
-              Orders Over {period === "today" ? "Today (Hourly)" : period === "week" ? "This Week (Daily)" : "This Year (Monthly)"}
+              Orders Over {period === "today" ? "Today (Hourly)" : period === "week" ? "This Week (Daily)" : period === "month" ? "This Month (Datewise)" : "This Year (Monthly)"}
             </h2>
             <Bar data={ordersChartData}
               options={{
@@ -507,7 +614,7 @@ setAllTimeTopItems(allTop5);
             className="bg-white rounded-2xl p-6 shadow"
           >
             <h2 className="text-lg font-bold mb-4 text-gray-800">
-              Revenue Over {period === "today" ? "Today (Hourly)" : period === "week" ? "This Week (Daily)" : "This Year (Monthly)"}
+              Revenue Over {period === "today" ? "Today (Hourly)" : period === "week" ? "This Week (Daily)" : period === "month" ? "This Month (Datewise)" : "This Year (Monthly)"}
             </h2>
             <Bar data={revenueChartData}
               options={{
@@ -528,17 +635,17 @@ setAllTimeTopItems(allTop5);
           </motion.div>
         </div>
         {/* Advanced Analytics Section */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Top 5 Items */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
+          {/* Top 5 Items by period */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl p-6 shadow"
           >
             <h2 className="text-lg font-bold mb-4 text-gray-800">
-              Top 5 Most Ordered Bakery Items ({period === "today" ? "Today" : period === "week" ? "This Week" : "This Year"})
+              Top 5 Most Ordered Bakery Items ({period === "today" ? "Today" : period === "week" ? "This Week" : period === "month" ? "This Month" : "This Year"})
             </h2>
-            <Bar data={itemChartData}
+            <Bar data={topItemsChart}
               options={{
                 responsive: true,
                 plugins: {
@@ -560,38 +667,29 @@ setAllTimeTopItems(allTop5);
               ))}
             </ul>
           </motion.div>
+          {/* Top 5 Items All Time */}
           <motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  className="bg-white rounded-2xl p-6 shadow"
->
-  <h2 className="text-lg font-bold mb-4 text-gray-800">
-    Top 5 Most Ordered Bakery Items (All Time)
-  </h2>
-  <Bar
-    data={{
-      labels: allTimeTopItems.map(([name]) => name),
-      datasets: [
-        {
-          label: "Orders",
-          data: allTimeTopItems.map(([, qty]) => qty),
-          backgroundColor: "#f472b6",
-        },
-      ],
-    }}
-    options={{
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        title: { display: false },
-      },
-      scales: {
-        y: { beginAtZero: true },
-      },
-    }}
-    height={260}
-  />
-    <ul className="mt-4 space-y-2">
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Top 5 Most Ordered Bakery Items (All Time)
+            </h2>
+            <Bar data={allTimeTopItemsChart}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { display: false },
+                  title: { display: false }
+                },
+                scales: {
+                  y: { beginAtZero: true },
+                }
+              }}
+              height={260}
+            />
+            <ul className="mt-4 space-y-2">
               {allTimeTopItems.map(([name, qty], i) => (
                 <li key={name} className="flex justify-between">
                   <span className="font-medium">{i + 1}. {name}</span>
@@ -599,9 +697,56 @@ setAllTimeTopItems(allTop5);
                 </li>
               ))}
             </ul>
-</motion.div>
-          
-
+          </motion.div>
+          <div className="grid grid-cols-1 gap-8 mt-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Most Ordered Bakery Item by {period === "today" ? "Hour" : period === "week" ? "Day" : period === "month" ? "Date" : "Month"}
+            </h2>
+            <Bar
+              data={{
+                labels: getTimeLabels(period),
+                datasets: [
+                  {
+                    label: "Most Ordered Item (Qty)",
+                    data: perTimeMostOrdered.map((x) => x.qty || 0),
+                    backgroundColor: "#f59e42",
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: { beginAtZero: true },
+                },
+              }}
+              height={220}
+            />
+            <ul className="mt-4 space-y-2">
+              {perTimeMostOrdered.map((x, i) =>
+                x.item ? (
+                  <li key={i} className="flex justify-between">
+                    <span className="font-medium">
+                      {getTimeLabels(period)[i]}: {x.item}
+                    </span>
+                    <span className="text-orange-600">{x.qty} ordered</span>
+                  </li>
+                ) : (
+                  <li key={i} className="flex justify-between text-gray-400">
+                    <span className="font-medium">
+                      {getTimeLabels(period)[i]}: No orders
+                    </span>
+                  </li>
+                )
+              )}
+            </ul>
+          </motion.div>
+        </div>
           {/* Top 5 Customers */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -609,7 +754,7 @@ setAllTimeTopItems(allTop5);
             className="bg-white rounded-2xl p-6 shadow"
           >
             <h2 className="text-lg font-bold mb-4 text-gray-800">
-              Top 5 Customers ({period === "today" ? "Today" : period === "week" ? "This Week" : "This Year"})
+              Top 5 Customers ({period === "today" ? "Today" : period === "week" ? "This Week" : period === "month" ? "This Month" : "This Year"})
             </h2>
             <Bar data={customerChartData}
               options={{
@@ -633,138 +778,105 @@ setAllTimeTopItems(allTop5);
               ))}
             </ul>
           </motion.div>
+          
         </div>
-
-        {/* Orders and Revenue over Time */}
-       
-
-        {/* New Users, User Segmentation */}
+        {/* Most Ordered Bakery Item by Time Unit (Hour/Day/Date/Month) */}
+     
+        {/* User Segmentation */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
-          {/* New Users */}
-    
-
-
-{/* Top 5 by Orders */}
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  className="bg-white rounded-2xl p-6 shadow"
->
-  <h2 className="text-lg font-bold mb-4 text-gray-800">
-    Top 5 Customers by Orders (All Time)
-  </h2>
-  <Bar
-    data={{
-      labels: customerSegments.topByOrders.map(([email]) => email),
-      datasets: [
-        {
-          label: 'Orders',
-          data: customerSegments.topByOrders.map(([, stats]) => stats.orders),
-          backgroundColor: '#8b5cf6',
-        },
-      ],
-    }}
-    options={{
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { precision: 0 } },
-      },
-    }}
-  />
-</motion.div>
-
-{/* Top 5 by Spend */}
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  className="bg-white rounded-2xl p-6 shadow"
->
-  <h2 className="text-lg font-bold mb-4 text-gray-800">
-    Top 5 Customers by Spend (All Time)
-  </h2>
-  <Bar
-    data={{
-      labels: customerSegments.topBySpend.map(([email]) => email),
-      datasets: [
-        {
-          label: 'Spend (₹)',
-          data: customerSegments.topBySpend.map(([, stats]) => stats.spend),
-          backgroundColor: '#f59e0b',
-        },
-      ],
-    }}
-    options={{
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function (value) {
-              return '₹' + value;
-            },
-          },
-        },
-      },
-    }}
-  />
-</motion.div>
-
-{/* Inactive Users (Bar chart showing inactive count per period, optional customization) */}
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  className="bg-white rounded-2xl p-6 shadow"
->
-  <h2 className="text-lg font-bold mb-4 text-gray-800">
-    Inactive Customers (All Time)
-  </h2>
-  <Bar
-    data={{
-      labels: customerSegments.inactive.slice(0, 5),
-      datasets: [
-        {
-          label: 'Inactive (no orders)',
-          data: Array(Math.min(5, customerSegments.inactive.length)).fill(1),
-          backgroundColor: '#9ca3af',
-        },
-      ],
-    }}
-    options={{
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            precision: 0,
-            stepSize: 1,
-          },
-        },
-      },
-    }}
-  />
-  {customerSegments.inactive.length > 5 && (
-    <p className="mt-2 text-gray-400 text-sm">
-      +{customerSegments.inactive.length - 5} more inactive customers
-    </p>
-  )}
-</motion.div>
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  className="bg-white rounded-2xl p-6 shadow"
->
-  <h2 className="text-lg font-bold mb-4 text-gray-800">
-    New Users {period === "today" ? "Today" : period === "week" ? "This Week" : "This Year"}
-  </h2>
-  <div className="flex items-center space-x-4">
-    <div className="text-4xl font-bold text-purple-600">{newUsers}</div>
-    <span className="text-gray-500">joined</span>
-  </div>
-</motion.div>
-
+          {/* Top 5 by Orders */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Top 5 Customers by Orders (All Time)
+            </h2>
+            <Bar
+              data={{
+                labels: customerSegments.topByOrders.map(([email]) => email),
+                datasets: [
+                  {
+                    label: 'Orders',
+                    data: customerSegments.topByOrders.map(([, stats]) => stats.orders),
+                    backgroundColor: '#8b5cf6',
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: { beginAtZero: true, ticks: { precision: 0 } },
+                },
+              }}
+              height={220}
+            />
+          </motion.div>
+          {/* Top 5 by Spend */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              Top 5 Customers by Spend (All Time)
+            </h2>
+            <Bar
+              data={{
+                labels: customerSegments.topBySpend.map(([email]) => email),
+                datasets: [
+                  {
+                    label: 'Spend (₹)',
+                    data: customerSegments.topBySpend.map(([, stats]) => stats.spend),
+                    backgroundColor: '#f59e0b',
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      callback: function (value) {
+                        return '₹' + value;
+                      },
+                    },
+                  },
+                },
+              }}
+              height={220}
+            />
+          </motion.div>
+          {/* New Users Joined Bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow"
+          >
+            <h2 className="text-lg font-bold mb-4 text-gray-800">
+              New Users Joined ({period === "today" ? "Hourly" : period === "week" ? "Daily" : period === "month" ? "Datewise" : "Monthly"})
+            </h2>
+            <Bar data={newUsersBarData}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { display: false },
+                  title: { display: false }
+                },
+                scales: {
+                  y: { beginAtZero: true },
+                }
+              }}
+              height={220}
+            />
+            <div className="mt-4 text-sm text-gray-500">
+              Total New Users: <span className="font-bold text-purple-700">{newUsersTotal}</span>
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>
