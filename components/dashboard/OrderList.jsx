@@ -86,10 +86,10 @@ const PAYMENT_STATUS_CONFIG = {
     bgColor: 'bg-yellow-50',
     text: 'Payment Pending'
   },
-  completed: {
+  confirmed: {
     color: 'text-green-600',
     bgColor: 'bg-green-50',
-    text: 'Payment Completed'
+    text: 'Payment Confirmed'
   },
   failed: {
     color: 'text-red-600',
