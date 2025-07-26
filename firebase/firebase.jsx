@@ -14,7 +14,8 @@ import {
   query, 
   where, 
   orderBy, 
-  serverTimestamp 
+  serverTimestamp,
+  Timestamp
 } from 'firebase/firestore';
 
 // Firebase configuration
@@ -210,32 +211,34 @@ const deleteProduct = async (productId) => {
 
 const getProducts = async () => {
   try {
+    console.log('Fetching bakery items...');
     const querySnapshot = await getDocs(collection(db, 'bakeryItems'));
-    const products = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      name: doc.data().name || '',
-      imageUrl: doc.data().imageUrl || '',
-      description: doc.data().description || '',
-      category: doc.data().category || 'other',
-      price: parseFloat(doc.data().price || 0),
-      quantity: parseInt(doc.data().quantity || 0),
-      inStock: Boolean(doc.data().inStock),
-      isNew: Boolean(doc.data().isNew),
-      createdAt: doc.data().createdAt?.toDate()?.toISOString() || new Date().toISOString(),
-      updatedAt: doc.data().updatedAt?.toDate()?.toISOString() || new Date().toISOString()
-    }));
+    console.log('Documents fetched:', querySnapshot.docs.length);
 
+    const products = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name || '',
+        imageUrl: data.imageUrl || '',
+        description: data.description || '',
+        category: data.category || 'other',
+        price: parseFloat(data.price || 0),
+        quantity: parseInt(data.quantity || 0),
+        inStock: Boolean(data.inStock),
+        isNew: Boolean(data.isNew),
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (data.createdAt ? new Date(data.createdAt).toISOString() : new Date().toISOString()),
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : (data.updatedAt ? new Date(data.updatedAt).toISOString() : new Date().toISOString()),
+      };
+    });
+
+    console.log('Processed products:', products.length);
     return { success: true, data: products };
   } catch (error) {
-    console.error('Get bakery items error:', {
-      error: error.message,
-      timestamp: CURRENT_TIMESTAMP,
-      user: CURRENT_USER
-    });
-    return { success: false, error: error.message };
+    console.error('Get bakery items error:', error);
+    return { success: false, error: error.message || String(error) };
   }
 };
-
 // Orders functions
 const getOrders = async () => {
   try {
