@@ -17,10 +17,11 @@ import { logoutAdmin } from "@/firebase/firebase";
 
 const navigationItems = [
   { name: "Overview", href: "/dashboard", icon: HomeIcon },
+  { name: "Deep Analysis", href: "/dashboard/deep-analysis", icon: ClipboardDocumentListIcon },
   { name: "Products", href: "/dashboard/products", icon: ShoppingBagIcon },
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardDocumentListIcon },
   { name: "DataBase", href: "/dashboard/database", icon: CircleStackIcon },
-  { name: "Stock Tracker", href: "/dashboard/stock-tracker", icon: ClipboardDocumentListIcon },
+
   { name: "Settings", href: "/dashboard/settings", icon: Cog6ToothIcon },
 ];
 
