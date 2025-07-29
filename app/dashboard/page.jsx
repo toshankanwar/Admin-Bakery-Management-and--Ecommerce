@@ -455,11 +455,14 @@ export default function AdvancedAnalyticsDashboard() {
 
     orderItems.forEach(r => {
       if (!r.createdAt) return;
+      if (r.orderStatus === 'cancelled' || r.orderStatus === 'pending') return; // <-- exclude these statuses
+    
       if (r.createdAt < start || r.createdAt > end) return;
       let d = r.createdAt.getDay();
       d = d === 0 ? 6 : d - 1;
       matrix[d][r.createdAt.getHours()] += r.quantity;
     });
+    
 
     const points = [];
     for (let y = 0; y < days.length; y++) {
@@ -479,12 +482,13 @@ export default function AdvancedAnalyticsDashboard() {
 
     orderItems.forEach(r => {
       if (!r.createdAt) return;
+      if (r.orderStatus === 'cancelled' || r.orderStatus === 'pending') return; // Exclude cancelled and pending
       if (r.createdAt.getFullYear() !== selectedYearForMonthlyHeatmap) return;
       const m = r.createdAt.getMonth();
       const d = r.createdAt.getDate() - 1;
       if (d < maxDays) matrix[d][m] += r.quantity;
     });
-
+    
     const days = Array.from({ length: maxDays }, (_, i) => (i + 1).toString());
     const points = [];
     for (let y = 0; y < days.length; y++) {

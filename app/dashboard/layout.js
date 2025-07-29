@@ -11,17 +11,17 @@ import {
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
   CircleStackIcon,
+  PresentationChartBarIcon,
   ArrowLeftOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { logoutAdmin } from "@/firebase/firebase";
 
 const navigationItems = [
   { name: "Overview", href: "/dashboard", icon: HomeIcon },
-  { name: "Deep Analysis", href: "/dashboard/deep-analysis", icon: ClipboardDocumentListIcon },
+  { name: "Deep Analysis", href: "/dashboard/deep-analysis", icon: PresentationChartBarIcon },
+  { name: "DataBase", href: "/dashboard/database", icon: CircleStackIcon },
   { name: "Products", href: "/dashboard/products", icon: ShoppingBagIcon },
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardDocumentListIcon },
-  { name: "DataBase", href: "/dashboard/database", icon: CircleStackIcon },
-
   { name: "Settings", href: "/dashboard/settings", icon: Cog6ToothIcon },
 ];
 
