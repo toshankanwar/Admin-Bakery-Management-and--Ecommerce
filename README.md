@@ -19,10 +19,10 @@ An enhanced React-based Admin Dashboard for efficient order management, built wi
 
 This project provides a centralized interface for admins to manage customer orders, track order statuses, update payment information, and generate professional invoices in PDF format. It includes secure authentication and a responsive design.
 
-https://admin.bakery.toshankanwar.website/readmeimg/overview.png
-https://admin.bakery.toshankanwar.website/readmeimg/product.png
-https://admin.bakery.toshankanwar.website/readmeimg/orders.png
-https://admin.bakery.toshankanwar.website/readmeimg/db.png
+![image](https://admin.bakery.toshankanwar.website/readmeimg/overview.png)
+![image](https://admin.bakery.toshankanwar.website/readmeimg/product.png)
+![image](https://admin.bakery.toshankanwar.website/readmeimg/orders.png)
+![image](https://admin.bakery.toshankanwar.website/readmeimg/db.png)
 
 
 ## Features
