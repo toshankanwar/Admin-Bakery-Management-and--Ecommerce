@@ -1,4 +1,3 @@
-// app/login/page.jsx
 'use client';
 
 import { useState } from 'react';
@@ -24,16 +23,14 @@ export default function LoginPage() {
     try {
       // Sign in with Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Check if user has admin role
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      
       if (!userDoc.exists()) {
         throw new Error('User not found in database');
       }
 
       const userData = userDoc.data();
-      
       if (userData.role !== 'admin') {
         throw new Error('Unauthorized: Admin access required');
       }
@@ -42,7 +39,7 @@ export default function LoginPage() {
       console.log('Admin login successful:', {
         timestamp: '2025-06-12 17:53:04',
         user: 'Kala-bot-apk',
-        email: userCredential.user.email
+        email: userCredential.user.email,
       });
 
       // Redirect to dashboard
@@ -51,7 +48,7 @@ export default function LoginPage() {
       console.error('Login error:', {
         error: error.message,
         timestamp: '2025-06-12 17:53:04',
-        user: 'Kala-bot-apk'
+        user: 'Kala-bot-apk',
       });
 
       // User-friendly error messages
@@ -86,7 +83,7 @@ export default function LoginPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full space-y-8"
+        className="max-w-md w-full space-y-8 border border-gray-300 rounded-xl shadow-lg p-8 bg-white"
       >
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
@@ -96,15 +93,18 @@ export default function LoginPage() {
             Sign in to access the admin dashboard
           </p>
         </div>
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-sm text-yellow-800 rounded-md shadow">
-          <p>
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-sm text-yellow-800 rounded-md shadow-md 
+                        transition-colors duration-300 hover:bg-yellow-100">
+          <p className="select-none">
             <strong>Demo Credentials:</strong><br />
-            <span>Email:</span> <code>toshan22102@iiitnr.edu.in</code><br />
-            <span>Password:</span> <code>hellohii@12345</code>
+            <span className="font-semibold">Email:</span>{' '}
+            <code className="bg-yellow-100 rounded px-1 py-0.5">{'toshan22102@iiitnr.edu.in'}</code><br />
+            <span className="font-semibold">Password:</span>{' '}
+            <code className="bg-yellow-100 rounded px-1 py-0.5">{'hellohii@12345'}</code>
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">
@@ -118,7 +118,9 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 
+                           rounded-t-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm
+                           transition-all duration-200 hover:border-purple-400"
                 placeholder="Email address"
                 disabled={loading}
               />
@@ -135,7 +137,9 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900
+                           rounded-b-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm
+                           transition-all duration-200 hover:border-purple-400"
                 placeholder="Password"
                 disabled={loading}
               />
@@ -146,7 +150,7 @@ export default function LoginPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="rounded-md bg-red-50 p-4"
+              className="rounded-md bg-red-50 p-4 mt-1"
             >
               <div className="flex">
                 <div className="flex-shrink-0">
@@ -173,11 +177,13 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-purple-400 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white 
+                         bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-purple-400 
+                         disabled:cursor-not-allowed transition-colors duration-300"
             >
               <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                 <LockClosedIcon
-                  className="h-5 w-5 text-purple-500 group-hover:text-purple-400"
+                  className="h-5 w-5 text-purple-500 group-hover:text-purple-400 transition-colors duration-300"
                   aria-hidden="true"
                 />
               </span>
