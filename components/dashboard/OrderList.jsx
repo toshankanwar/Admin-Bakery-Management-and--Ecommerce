@@ -105,7 +105,6 @@ const PAYMENT_STATUS_CONFIG = {
   },
 };
 
-// Search Input Component
 const SearchInput = ({ value, onChange }) => (
   <div className="relative flex-1">
     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -117,9 +116,9 @@ const SearchInput = ({ value, onChange }) => (
       onChange={onChange}
       placeholder="Search orders by ID, customer name, or email..."
       className="block w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg
-                 focus:ring-2 focus:ring-purple-500 focus:border-purple-500
-                 hover:border-purple-300 transition-all duration-200
-                 placeholder-gray-400"
+                focus:ring-2 focus:ring-purple-500 focus:border-purple-500
+                hover:border-purple-300 transition-all duration-200
+                placeholder-gray-400"
     />
     {value && (
       <button
@@ -134,16 +133,15 @@ const SearchInput = ({ value, onChange }) => (
   </div>
 );
 
-// Sort Select Component
 const SortSelect = ({ value, onChange, options }) => (
   <div className="relative w-full sm:w-auto">
     <select
       value={value}
       onChange={onChange}
       className="appearance-none w-full bg-white pl-4 pr-10 py-2.5 text-sm border border-gray-200 rounded-lg
-                 focus:ring-2 focus:ring-purple-500 focus:border-purple-500
-                 hover:border-purple-300 transition-all duration-200 cursor-pointer
-                 font-medium text-gray-700"
+                focus:ring-2 focus:ring-purple-500 focus:border-purple-500
+                hover:border-purple-300 transition-all duration-200 cursor-pointer
+                font-medium text-gray-700"
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
@@ -157,7 +155,6 @@ const SortSelect = ({ value, onChange, options }) => (
   </div>
 );
 
-// Status Flow Indicator Component
 const StatusFlowIndicator = ({ currentStatus, onStatusChange }) => {
   const currentIndex = STATUS_FLOW.indexOf(currentStatus);
 
@@ -167,7 +164,6 @@ const StatusFlowIndicator = ({ currentStatus, onStatusChange }) => {
         const config = ORDER_STATUS_CONFIG[status];
         const isActive = index <= currentIndex;
         const isCurrent = status === currentStatus;
-
         return (
           <div key={status} className="flex items-center">
             <motion.button
@@ -195,7 +191,6 @@ const StatusFlowIndicator = ({ currentStatus, onStatusChange }) => {
   );
 };
 
-// Status Change Dialog Component
 const StatusChangeDialog = ({ isOpen, onClose, order, onConfirm, newStatus, isUpdating }) => {
   if (!isOpen) return null;
   const statusConfig = ORDER_STATUS_CONFIG[newStatus];
@@ -281,6 +276,9 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
 
   if (!order) return null;
 
+  // Last 8 chars for display
+  const orderShortId = order.id.slice(-8);
+
   const handleStatusChange = (newStatus) => {
     setSelectedStatus(newStatus);
     setIsStatusDialogOpen(true);
@@ -291,12 +289,10 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
       setIsUpdating(true);
       const orderRef = doc(db, 'orders', order.id);
       const updates = { orderStatus: selectedStatus, updatedAt: new Date() };
-      // Auto-update payment status to confirmed if order delivered
       if (selectedStatus === 'delivered') {
         updates.paymentStatus = 'confirmed';
       }
       await updateDoc(orderRef, updates);
-      // Inform parent component including paymentStatus update if any
       await onStatusChange(order.id, selectedStatus, updates.paymentStatus);
       setIsStatusDialogOpen(false);
       toast.success(`Order status updated to ${ORDER_STATUS_CONFIG[selectedStatus].label}`);
@@ -308,61 +304,60 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
     }
   };
 
-  // Generate the invoice HTML as a string
   const generateInvoiceHtml = () => {
     const address = order.address || {};
     const items = order.items || [];
     const formattedDate = order.createdAt ? order.createdAt.toLocaleString() : 'N/A';
     const deliveryDateFormatted = order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'N/A';
+    const orderDisplayId = order.id.slice(-8);
 
     const itemsRows = items
       .map(
         (item, idx) => `
-      <tr style="border-bottom:1px solid #ddd;text-align:left">
-        <td style="padding:8px;text-align:center">${idx + 1}</td>
-        <td style="padding:8px;">${item.name}</td>
-        <td style="padding:8px;text-align:center">${item.quantity}</td>
-        <td style="padding:8px;text-align:right">₹${item.price.toFixed(2)}</td>
-        <td style="padding:8px;text-align:right">₹${(item.quantity * item.price).toFixed(2)}</td>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${idx + 1}</td>
+        <td style="padding: 8px; border: 1px solid #ccc;">${item.name}</td>
+        <td style="padding: 8px; border: 1px solid #ccc; text-align:center;">${item.quantity}</td>
+        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">₹${item.price.toFixed(2)}</td>
+        <td style="padding: 8px; border: 1px solid #ccc; text-align:right;">₹${(item.price * item.quantity).toFixed(2)}</td>
       </tr>
     `
       )
       .join('');
 
-    // Clean, minimal styles for jsPDF rendering
     return `
-    <div style="font-family:Arial, sans-serif; color:#000; max-width:600px; margin:auto; padding:20px;">
-      <h1 style="text-align:center; margin-bottom:20px;">Invoice</h1>
-      <p><strong>Order ID:</strong> ${order.id}</p>
-      <p><strong>Order Date:</strong> ${formattedDate}</p>
-      <p><strong>Delivery Date:</strong> ${deliveryDateFormatted}</p>
-      <h2>Shipping Address</h2>
-      <p>${address.name || ''}</p>
-      <p>${address.address || ''} ${address.apartment || ''}</p>
-      <p>${address.city || ''}, ${address.state || ''}, PIN: ${address.pincode || ''}</p>
-      <p>Mobile: ${address.mobile || ''}</p>
-      <h2>Order Items</h2>
-      <table style="width:100%; border-collapse:collapse; margin-top:10px;">
-        <thead style="background:#eee;">
-          <tr>
-            <th style="border:1px solid #ccc; padding:8px; text-align:center;">#</th>
-            <th style="border:1px solid #ccc; padding:8px;">Product</th>
-            <th style="border:1px solid #ccc; padding:8px; text-align:center;">Qty</th>
-            <th style="border:1px solid #ccc; padding:8px; text-align:right;">Price</th>
-            <th style="border:1px solid #ccc; padding:8px; text-align:right;">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsRows}
-        </tbody>
-      </table>
-      <div style="text-align:right; margin-top:20px;">
-        <p><strong>Subtotal:</strong> ₹${order.subtotal?.toFixed(2) ?? '0.00'}</p>
-        <p><strong>Shipping:</strong> ₹${order.shipping?.toFixed(2) ?? '0.00'}</p>
-        <p><strong>Total:</strong> ₹${order.total?.toFixed(2) ?? '0.00'}</p>
+      <div style="font-family:Arial, sans-serif; color:#000; max-width:600px; margin:auto; padding:20px;">
+        <h1 style="text-align:center; margin-bottom:20px;">Invoice</h1>
+        <p><strong>Order ID:</strong> ${orderDisplayId}</p>
+        <p><strong>Order Date:</strong> ${formattedDate}</p>
+        <p><strong>Delivery Date:</strong> ${deliveryDateFormatted}</p>
+        <h2>Shipping Address</h2>
+        <p>${address.name || ''}</p>
+        <p>${address.address || ''} ${address.apartment || ''}</p>
+        <p>${address.city || ''}, ${address.state || ''}, PIN: ${address.pincode || ''}</p>
+        <p>Mobile: ${address.mobile || ''}</p>
+        <h2>Order Items</h2>
+        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+          <thead style="background:#eee;">
+            <tr>
+              <th style="border:1px solid #ccc; padding:8px;">#</th>
+              <th style="border:1px solid #ccc; padding:8px;">Product</th>
+              <th style="border:1px solid #ccc; padding:8px;">Qty</th>
+              <th style="border:1px solid #ccc; padding:8px;">Price</th>
+              <th style="border:1px solid #ccc; padding:8px;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsRows}
+          </tbody>
+        </table>
+        <div style="text-align:right; margin-top:20px;">
+          <p><strong>Subtotal:</strong> ₹${order.subtotal?.toFixed(2) ?? '0.00'}</p>
+          <p><strong>Shipping:</strong> ₹${order.shipping?.toFixed(2) ?? '0.00'}</p>
+          <p><strong>Total:</strong> ₹${order.total?.toFixed(2) ?? '0.00'}</p>
+        </div>
+        <p style="text-align:center; margin-top:40px;">Thank you for your purchase!</p>
       </div>
-      <p style="text-align:center; margin-top:40px;">Thank you for your purchase!</p>
-    </div>
     `;
   };
 
@@ -370,18 +365,16 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
     setInvoiceHtml(generateInvoiceHtml());
   };
 
-  // Generate PDF after invoiceHtml is set and element rendered
   useEffect(() => {
     if (!invoiceHtml) return;
-
     const generatePdf = async () => {
       if (!invoiceContainerRef.current) return;
       const pdf = new jsPDF('p', 'pt', 'a4');
       try {
         await pdf.html(invoiceContainerRef.current, {
           callback: (doc) => {
-            doc.save(`Invoice-${order.id}.pdf`);
-            setInvoiceHtml(''); // cleanup to hide container
+            doc.save(`Invoice-${order.id.slice(-8)}.pdf`);
+            setInvoiceHtml('');
           },
           x: 10,
           y: 10,
@@ -393,35 +386,20 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
         setInvoiceHtml('');
       }
     };
-
     generatePdf();
   }, [invoiceHtml, order.id]);
 
   return (
     <>
-      {/* Hidden Invoice Container for PDF generation */}
       {invoiceHtml && (
         <div
           ref={invoiceContainerRef}
-          style={{
-            position: 'fixed',
-            top: '-9999px',
-            left: '-9999px',
-            width: '595px', // A4 width approx
-            backgroundColor: '#fff',
-            padding: 20,
-          }}
+          style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '595px', backgroundColor: '#fff', padding: 20 }}
           dangerouslySetInnerHTML={{ __html: invoiceHtml }}
         />
       )}
-
-      {/* Main Order Details Dialog */}
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="order-detail-title"
-      >
+      {/* The Dialog as previously rendered, show order id as last 8 chars everywhere */}      
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -433,7 +411,7 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
           <div className="sticky top-0 bg-white border-b border-purple-100 px-6 py-4 flex items-center justify-between z-10">
             <div className="flex items-center space-x-4">
               <h3 id="order-detail-title" className="text-lg font-medium text-gray-900">
-                Order #{order.id.slice(0, 6)}
+                Order #{orderShortId}
               </h3>
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
@@ -452,14 +430,10 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
               <XMarkIcon className="h-6 w-6" />
             </button>
           </div>
-
-          {/* Order Progress */}
           <div className="bg-white rounded-lg border border-purple-100 p-4 m-6">
             <h4 className="text-sm font-medium text-gray-900 mb-4">Order Progress</h4>
             <StatusFlowIndicator currentStatus={order.orderStatus} onStatusChange={handleStatusChange} />
           </div>
-
-          {/* Order Summary */}
           <div className="bg-purple-50 rounded-lg p-6 border border-purple-100 mx-6 mb-6 grid grid-cols-1 md:grid-cols-5 gap-6">
             <div>
               <p className="text-sm text-purple-600 font-medium">Order Date</p>
@@ -482,12 +456,9 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
               <p className="text-lg font-bold text-purple-600">₹{order.total?.toFixed(2) || '0.00'}</p>
             </div>
           </div>
-
-          {/* Order Items */}
+          {/* Items */}
           <section className="mx-6 mb-6">
-            <h4 className="text-sm font-medium text-gray-900 border-b border-purple-100 pb-2 mb-4">
-              Order Items
-            </h4>
+            <h4 className="text-sm font-medium text-gray-900 border-b border-purple-100 pb-2 mb-4">Order Items</h4>
             <div className="space-y-4">
               {order.items?.map((item, idx) => (
                 <motion.div
@@ -515,7 +486,6 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
               ))}
             </div>
           </section>
-
           {/* Shipping and Payment Info */}
           <section className="mx-6 mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-lg border border-purple-100 hover:border-purple-200 transition-colors">
@@ -536,7 +506,6 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
                 </p>
               </div>
             </div>
-
             <div className="bg-white p-6 rounded-lg border border-purple-100 hover:border-purple-200 transition-colors">
               <div className="flex items-center space-x-2 text-sm font-medium text-gray-900 mb-4">
                 <BanknotesIcon className="h-5 w-5 text-purple-500" />
@@ -572,7 +541,6 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
               </div>
             </div>
           </section>
-
           {/* Download Invoice Button */}
           <div className="mx-6 mb-8 flex justify-end">
             <button
@@ -584,8 +552,6 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
               Download Invoice (PDF)
             </button>
           </div>
-
-          {/* Status Confirmation Dialog */}
           <AnimatePresence>
             {isStatusDialogOpen && (
               <StatusChangeDialog
@@ -604,7 +570,6 @@ const OrderDetailsDialog = ({ order, onClose, onStatusChange }) => {
   );
 };
 
-// Main OrderList Component with full functionality intact
 const OrderList = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -669,7 +634,6 @@ const OrderList = () => {
     fetchOrders();
   }, []);
 
-  // Update order and payment status in state on status change
   const handleStatusChange = async (orderId, newStatus, newPaymentStatus) => {
     setOrders((prev) =>
       prev.map((order) =>
@@ -777,7 +741,6 @@ const OrderList = () => {
               {refreshing ? 'Refreshing...' : 'Refresh Orders'}
             </motion.button>
           </div>
-
           {/* Filters */}
           <div className="bg-white rounded-xl shadow-sm border border-purple-100 overflow-hidden">
             <div className="p-6 space-y-6">
@@ -811,7 +774,6 @@ const OrderList = () => {
                   />
                 </div>
               </div>
-
               <div className="flex items-center gap-3 text-sm text-gray-500">
                 <FunnelIcon className="h-4 w-4 text-purple-500" />
                 <div className="flex items-center gap-2 flex-wrap">
@@ -835,7 +797,6 @@ const OrderList = () => {
                 </div>
               </div>
             </div>
-
             {/* Orders list */}
             <AnimatePresence mode="wait">
               {processedOrders.length > 0 ? (
@@ -863,7 +824,7 @@ const OrderList = () => {
                     >
                       <div className="p-6 grid grid-cols-[1fr_6rem_5rem_6rem_6rem] items-center gap-4">
                         <div>
-                          <p className="text-sm font-medium text-purple-600 truncate">{order.id.slice(0, 6)}</p>
+                          <p className="text-sm font-medium text-purple-600 truncate">{order.id.slice(-8)}</p>
                           <p className="text-xs text-gray-600 truncate">{order.customerName}</p>
                         </div>
                         <div className="text-sm text-gray-500 text-right">{order.createdAt.toLocaleString()}</div>
@@ -890,7 +851,6 @@ const OrderList = () => {
                 </div>
               )}
             </AnimatePresence>
-
             {/* Load more button */}
             {processedOrders.length < orders.length && (
               <div className="flex justify-center py-4">
@@ -905,7 +865,6 @@ const OrderList = () => {
             )}
           </div>
         </div>
-
         {/* Order details dialog */}
         <AnimatePresence>
           {selectedOrder && (
