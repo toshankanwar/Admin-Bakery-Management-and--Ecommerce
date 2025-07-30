@@ -1,7 +1,14 @@
 'use client'
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { db, collection, addDoc } from '@/firebase/firebase';
+import {
+  db,
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+} from '@/firebase/firebase';
 
 const PREDICTION_API_URL = "https://toshan-bakery-prediction-api.onrender.com/api/predictions";
 const FIREBASE_COLLECTION = "stored_predictions";
@@ -13,6 +20,44 @@ export default function TomorrowPredictions() {
 
   // Tomorrow's date string in YYYY-MM-DD format (UTC-based)
   const tomorrowDateStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+  // Utility to check if predictions for tomorrow already exist in Firebase
+  async function fetchPredictionsFromFirebase(date) {
+    try {
+      const colRef = collection(db, FIREBASE_COLLECTION);
+      const q = query(colRef, where("date", "==", date));
+      const querySnapshot = await getDocs(q);
+      const results = [];
+      querySnapshot.forEach((doc) => {
+        results.push(doc.data());
+      });
+      return results;
+    } catch (fbErr) {
+      console.error("Error fetching predictions from Firebase:", fbErr);
+      return [];
+    }
+  }
+
+  // Utility to store new predictions to Firebase if none exist yet for that date
+  async function addPredictionsToFirebase(preds, date) {
+    // First check if any predictions for 'date' already exist
+    const existing = await fetchPredictionsFromFirebase(date);
+    if (existing.length > 0) {
+      console.log(`Predictions for date ${date} already exist in Firebase. Skipping add.`);
+      return;
+    }
+    console.log(`Adding ${preds.length} predictions for date ${date} to Firebase...`);
+    for (const pred of preds) {
+      try {
+        await addDoc(collection(db, FIREBASE_COLLECTION), {
+          ...pred,
+          storedAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.error("Error adding prediction to Firebase:", e);
+      }
+    }
+  }
 
   useEffect(() => {
     async function fetchAndStore() {
@@ -29,18 +74,33 @@ export default function TomorrowPredictions() {
           (p) => p.date === tomorrowDateStr
         );
 
-        setPredictions(tomorrowsPredictions);
-
-        // Store predictions in Firestore collection
-        for (const pred of tomorrowsPredictions) {
-          await addDoc(collection(db, FIREBASE_COLLECTION), {
-            ...pred,
-            storedAt: new Date().toISOString(),
-          });
+        if (tomorrowsPredictions.length > 0) {
+          // Save to state
+          setPredictions(tomorrowsPredictions);
+          // Store to Firebase only if not already there
+          await addPredictionsToFirebase(tomorrowsPredictions, tomorrowDateStr);
+        } else {
+          // API returned empty array, fallback: try to fetch from Firebase
+          console.warn("API returned empty predictions, fetching from Firebase...");
+          const firebasePredictions = await fetchPredictionsFromFirebase(tomorrowDateStr);
+          if (firebasePredictions.length > 0) {
+            console.log(`Fetched ${firebasePredictions.length} predictions from Firebase.`);
+            setPredictions(firebasePredictions);
+          } else {
+            setPredictions([]);
+            setError("No prediction data available currently.");
+          }
         }
+
       } catch (err) {
         console.error("Error fetching/storing predictions:", err);
         setError("Failed to load predictions.");
+        // Try to fallback fetching from Firebase anyway on error
+        const fallbackPredictions = await fetchPredictionsFromFirebase(tomorrowDateStr);
+        if (fallbackPredictions.length > 0) {
+          setPredictions(fallbackPredictions);
+          setError(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -75,7 +135,9 @@ export default function TomorrowPredictions() {
         </div>
 
         {loading && (
-          <p className="text-center text-indigo-500 text-xl animate-pulse">Loading predictions...</p>
+          <p className="text-center text-indigo-500 text-xl animate-pulse">
+            Loading predictions...
+          </p>
         )}
 
         {error && (

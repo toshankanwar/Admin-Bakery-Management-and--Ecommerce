@@ -1,0 +1,75 @@
+🚀 Toshan Bakery — Best Bakery in Naya Raipur 🍰🥐
+
+I am thrilled to share the complete digital ecosystem I have built for Toshan Bakery — from the customer-facing website to a powerful admin dashboard for management and analytics.
+
+🌐 Website: https://bakery.toshankanwar.website/
+📊 Admin Dashboard: https://admin.bakery.toshankanwar.website/dashboard
+
+Core Features and Technologies:
+✅ Payment Gateway & Refunds:
+Integrated Razorpay for secure payments with robust automatic refund handling for canceled orders. Personally tested refunds take about 1.5 days to reflect in customer accounts.
+
+✅ Atomic & Consistent Inventory Management:
+Used Firebase runTransaction API for automatic, server-side inventory decrement ensuring Atomicity, Consistency, Isolation, and Durability (ACID) to prevent race conditions and maintain concurrency integrity.
+
+✅ Client + Server-side Validations:
+Implemented logic in both frontend (cart & checkout) and backend to verify item quantities and stock before confirming orders, guaranteeing perfect data integrity.
+
+✅ User Experience Enhancements:
+
+Save addresses for quick next orders
+
+Sophisticated sorting algorithms for shop & order pages
+
+Favorites system to track liked items
+
+Dedicated item pages with individual review system shown upon order delivery
+
+Add personal customization notes per item at checkout
+
+Powerful search supporting item names & descriptions
+
+Responsive and mobile-friendly UI — delivers an app-like experience for all users
+
+✅ Custom Email Servers:
+Built own mail servers for timely welcome emails and order confirmations, powered by Node.js and deployed on Vercel Free Tier. Due to Render free-tier hosting for order service, initial cold starts may sometimes delay email confirmation.
+
+✅ Automated Stock Restocking:
+When orders are canceled, items are automatically restocked via backend processes.
+
+About the Admin Dashboard:
+🛠️ An all-in-one management system with:
+
+Seamless order and product management pages
+
+Advanced data analytics displaying key insights such as top-selling items and peak order hours
+
+Automated CSV generation with multiple sorting parameters for custom data exports
+
+🤖 Powered by an end-to-end prediction pipeline:
+
+Automatically fetches raw data from the database
+
+Trains and updates machine learning models without manual intervention
+
+Sends predictions to API and stores them in Firebase for further use
+
+Tech Stack Highlights:
+Next.js | Node.js | Firebase (Firestore, Functions)
+
+Nodemailer | Chart.js | Tailwind CSS | Python for prediction models
+
+Advanced use of AI tools including GitHub Copilot, ChatGPT, and Perplexity AI helped accelerate development.
+
+Created 6 separate GitHub accounts to utilize GitHub Copilot for free and implemented secret code protections for my proprietary code.
+
+Why I Built This:
+This project was a personal growth challenge and a fun way to explore full-stack and AI-integrated development. Proudly developed end-to-end by me, it's a testament to what one developer can achieve with determination and resourcefulness.
+
+🙏 If you have feedback or suggestions for enhancements, I would love to hear from you!
+
+Thanks for all the support and encouragement. Much love to the community! ❤️
+
+Feel free to tag relevant technologies, teams, or communities and add imagery or screenshots from your bakery or dashboard for more engagement.
+
+Would you like me to help create social media graphics or concise versions for Twitter/Instagram? Let me know!
