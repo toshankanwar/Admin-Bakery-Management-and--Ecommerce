@@ -1,6 +1,8 @@
 # Admin Dashboard
 
 An enhanced React-based Admin Dashboard for efficient order management, built with Next.js, Firebase, and Tailwind CSS. This dashboard allows admins to view, filter, and update orders with a clean UI and powerful features.
+End-to-end prediction pipeline developed for early forecasting.
+APi Endpoint https://toshan-bakery-prediction-api.onrender.com/api/predictions
 
 ## Table of Contents
 
