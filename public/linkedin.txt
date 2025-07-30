@@ -1,6 +1,8 @@
-🚀 Toshan Bakery — Best Bakery in Naya Raipur 🍰🥐
+🚀 Toshan Bakery — Best Bakery in Naya Raipur😅😅 🍰🥐
 
+Make fun आगे देखो मजा आएगा 😎
 I am thrilled to share the complete digital ecosystem I have built for Toshan Bakery — from the customer-facing website to a powerful admin dashboard for management and analytics.
+Search Toshan kanwar on google to know about digital ecosystem
 
 🌐 Website: https://bakery.toshankanwar.website/
 📊 Admin Dashboard: https://admin.bakery.toshankanwar.website/dashboard
@@ -10,7 +12,7 @@ Core Features and Technologies:
 Integrated Razorpay for secure payments with robust automatic refund handling for canceled orders. Personally tested refunds take about 1.5 days to reflect in customer accounts.
 
 ✅ Atomic & Consistent Inventory Management:
-Used Firebase runTransaction API for automatic, server-side inventory decrement ensuring Atomicity, Consistency, Isolation, and Durability (ACID) to prevent race conditions and maintain concurrency integrity.
+Used Firebase runTransaction API to built custom Nodejs server for automatic, server-side inventory decrement ensuring Atomicity, Consistency, Isolation, and Durability (ACID) to prevent race conditions and maintain concurrency integrity.
 
 ✅ Client + Server-side Validations:
 Implemented logic in both frontend (cart & checkout) and backend to verify item quantities and stock before confirming orders, guaranteeing perfect data integrity.
@@ -69,7 +71,3 @@ This project was a personal growth challenge and a fun way to explore full-stack
 🙏 If you have feedback or suggestions for enhancements, I would love to hear from you!
 
 Thanks for all the support and encouragement. Much love to the community! ❤️
-
-Feel free to tag relevant technologies, teams, or communities and add imagery or screenshots from your bakery or dashboard for more engagement.
-
-Would you like me to help create social media graphics or concise versions for Twitter/Instagram? Let me know!
