@@ -12,6 +12,7 @@ import {
   Cog6ToothIcon,
   CircleStackIcon,
   PresentationChartBarIcon,
+  PresentationChartLineIcon,
   ArrowLeftOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { logoutAdmin } from "@/firebase/firebase";
@@ -22,6 +23,7 @@ const navigationItems = [
   { name: "DataBase", href: "/dashboard/database", icon: CircleStackIcon },
   { name: "Products", href: "/dashboard/products", icon: ShoppingBagIcon },
   { name: "Orders", href: "/dashboard/orders", icon: ClipboardDocumentListIcon },
+  { name: "Predictions", href: "/dashboard/predictions", icon: PresentationChartLineIcon },
   { name: "Settings", href: "/dashboard/settings", icon: Cog6ToothIcon },
 ];
 

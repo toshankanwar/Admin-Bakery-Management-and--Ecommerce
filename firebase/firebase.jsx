@@ -339,6 +339,8 @@ const getDashboardStats = async () => {
 export {
   auth,
   db,
+  addDoc,
+  collection,
   loginAdmin,
   logoutAdmin,
   addProduct,
